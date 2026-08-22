@@ -435,6 +435,7 @@
     if (e.key === "Escape") {
       deselect();
       document.getElementById("travel-overlay").classList.add("hidden");
+      document.getElementById("character-modal").classList.add("hidden");
     }
   });
 
@@ -461,6 +462,43 @@
     countdownInterval = setInterval(tick, 1000);
   }
 
+  // ---------- Character Steckbrief modal ----------
+  function getInitials(name) {
+    return name
+      .split(" / ")[0]
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  function openCharacterModal(c, accent) {
+    const modal = document.getElementById("character-modal");
+    document.getElementById("character-avatar").innerHTML = `<span style="--accent-color:${accent}">${getInitials(c.name)}</span>`;
+    document.getElementById("character-name").textContent = c.name;
+    document.getElementById("character-role").textContent = c.role;
+    document.getElementById("character-bio").textContent =
+      c.bio || "Zu diesem Charakter liegt noch kein ausführlicher Steckbrief vor.";
+
+    const filmsList = document.getElementById("character-films");
+    filmsList.innerHTML = "";
+    (c.films || []).forEach((f) => {
+      const li = document.createElement("li");
+      li.style.setProperty("--accent-color", accent);
+      li.innerHTML = `
+        <div class="cf-top"><span>${f.title}</span><span class="cf-year">${f.year}</span></div>
+        ${f.note ? `<div class="cf-note">${f.note}</div>` : ""}`;
+      filmsList.appendChild(li);
+    });
+
+    modal.classList.remove("hidden");
+  }
+
+  document.getElementById("character-close").addEventListener("click", () => {
+    document.getElementById("character-modal").classList.add("hidden");
+  });
+
   // ---------- Fill side panel ----------
   function fillPanel(u) {
     document.getElementById("panel-eyebrow").textContent = u.eyebrow.toUpperCase();
@@ -483,19 +521,14 @@
     charList.innerHTML = "";
     u.characters.forEach((c) => {
       const li = document.createElement("li");
-      const initials = c.name
-        .split(" / ")[0]
-        .split(" ")
-        .map((w) => w[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
+      const initials = getInitials(c.name);
       li.innerHTML = `
         <div class="avatar" style="--accent-color:${u.accent}">${initials}</div>
         <div class="info">
           <span class="cname">${c.name}</span>
           <span class="crole">${c.role}</span>
         </div>`;
+      li.addEventListener("click", () => openCharacterModal(c, u.accent));
       charList.appendChild(li);
     });
 
