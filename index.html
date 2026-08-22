@@ -15,6 +15,24 @@
 
   <div id="vignette"></div>
 
+  <div id="user-gate">
+    <div class="gate-card-wrap">
+      <div class="gate-eyebrow">MULTIVERSUM-ZUGANG</div>
+      <h2>Wähle deinen Avatar</h2>
+      <p>Wer betritt heute das Marvel-Multiversum?</p>
+      <div id="gate-cards"></div>
+    </div>
+  </div>
+
+  <div id="profile-badge" class="hidden">
+    <div id="profile-avatar"></div>
+    <div class="profile-meta">
+      <span id="profile-name"></span>
+      <small id="profile-hero"></small>
+    </div>
+    <button id="profile-switch" title="Benutzer wechseln">⇄</button>
+  </div>
+
   <header id="hud">
     <h1 class="title">MARVEL <span>MULTIVERSE</span></h1>
     <p class="subtitle">Wähle ein Universum, um es zu erkunden</p>
@@ -23,6 +41,18 @@
   <div id="labels-layer"></div>
 
   <div id="hint">Klicke einen Planeten, um sein Universum zu betreten</div>
+
+  <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
+
+  <div id="travel-overlay" class="hidden">
+    <div id="travel-panel">
+      <button id="travel-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">CHRONOLOGIE</div>
+      <h2>Marvel Travel — Die MCU-Reise</h2>
+      <p class="travel-sub">Alle Filme des Marvel Cinematic Universe in chronologischer Reihenfolge — bis hin zu <strong>Avengers: Doomsday</strong>.</p>
+      <div id="travel-timeline"></div>
+    </div>
+  </div>
 
   <aside id="panel">
     <button id="panel-close" aria-label="Schließen">✕</button>

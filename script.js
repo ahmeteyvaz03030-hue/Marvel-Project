@@ -6,6 +6,91 @@
   const panel = document.getElementById("panel");
   const hint = document.getElementById("hint");
 
+  // ---------- User gate (Profilauswahl) ----------
+  function initUserGate() {
+    const gate = document.getElementById("user-gate");
+    const cardsWrap = document.getElementById("gate-cards");
+
+    Object.entries(AVATARS).forEach(([id, u]) => {
+      const card = document.createElement("button");
+      card.className = "gate-card";
+      card.style.setProperty("--hero-color", u.color);
+      card.innerHTML = `
+        <div class="gate-avatar">${u.svg}</div>
+        <div class="gate-name">${u.name}</div>
+        <div class="gate-hero">${u.hero}</div>`;
+      card.addEventListener("click", () => selectUser(id));
+      cardsWrap.appendChild(card);
+    });
+
+    function applyUser(id) {
+      const u = AVATARS[id];
+      if (!u) return;
+      document.getElementById("profile-avatar").innerHTML = u.svg;
+      document.getElementById("profile-name").textContent = u.name;
+      document.getElementById("profile-hero").textContent = u.hero;
+      const badge = document.getElementById("profile-badge");
+      badge.classList.remove("hidden");
+      badge.style.setProperty("--hero-color", u.color);
+    }
+
+    function selectUser(id) {
+      localStorage.setItem("marvelUser", id);
+      applyUser(id);
+      gate.classList.add("hidden");
+    }
+
+    let saved = null;
+    try {
+      saved = localStorage.getItem("marvelUser");
+    } catch (e) {
+      saved = null;
+    }
+    if (saved && AVATARS[saved]) {
+      applyUser(saved);
+      gate.classList.add("hidden");
+    }
+
+    document.getElementById("profile-switch").addEventListener("click", () => {
+      gate.classList.remove("hidden");
+    });
+  }
+  initUserGate();
+
+  // ---------- Marvel Travel (MCU-Chronologie) ----------
+  function initTravel() {
+    const btn = document.getElementById("travel-btn");
+    const overlay = document.getElementById("travel-overlay");
+    const closeBtn = document.getElementById("travel-close");
+    const container = document.getElementById("travel-timeline");
+
+    MCU_TIMELINE.forEach((phase) => {
+      const phaseEl = document.createElement("div");
+      phaseEl.className = "travel-phase";
+      const heading = document.createElement("h3");
+      heading.textContent = phase.phase;
+      phaseEl.appendChild(heading);
+
+      const list = document.createElement("div");
+      list.className = "travel-list";
+      phase.films.forEach((f) => {
+        const item = document.createElement("div");
+        item.className = "travel-item" + (f.finale ? " finale" : "");
+        item.innerHTML = `
+          <span class="travel-year">${f.year}</span>
+          <span class="travel-dot"></span>
+          <span class="travel-title">${f.title}</span>`;
+        list.appendChild(item);
+      });
+      phaseEl.appendChild(list);
+      container.appendChild(phaseEl);
+    });
+
+    btn.addEventListener("click", () => overlay.classList.remove("hidden"));
+    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+  }
+  initTravel();
+
   // ---------- Renderer / Scene / Camera ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -211,6 +296,89 @@
     });
   });
 
+  // ---------- Doctor Doom (stilisierte Wächter-Figur) ----------
+  function createDoomFigure() {
+    const group = new THREE.Group();
+
+    // Schulter-/Umhang-Silhouette (breit, unten)
+    const capeMat = new THREE.MeshStandardMaterial({
+      color: 0x0a2e16,
+      roughness: 0.75,
+      metalness: 0.25,
+      flatShading: true,
+      side: THREE.DoubleSide,
+    });
+    const cape = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.2, 8, 1, true), capeMat);
+    cape.rotation.x = Math.PI;
+    cape.position.y = -1.1;
+    group.add(cape);
+
+    // Kapuze hinter dem Kopf (kurz, nicht spitz — wirkt wie ein Umhang-Kragen)
+    const hoodMat = new THREE.MeshStandardMaterial({
+      color: 0x0f4a26,
+      roughness: 0.6,
+      metalness: 0.35,
+      flatShading: true,
+    });
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(1.7, 7, 6, 0, Math.PI * 2, 0, Math.PI * 0.62), hoodMat);
+    hood.position.set(0, 0.55, -0.35);
+    hood.rotation.x = Math.PI * 0.06;
+    group.add(hood);
+
+    // Metallmaske — das dominante Gesicht der Figur
+    const maskMat = new THREE.MeshStandardMaterial({
+      color: 0x8a6a2a,
+      roughness: 0.22,
+      metalness: 0.92,
+      flatShading: true,
+      emissive: 0x3a2a0c,
+      emissiveIntensity: 0.3,
+    });
+    const mask = new THREE.Mesh(new THREE.SphereGeometry(1.35, 7, 6), maskMat);
+    mask.scale.set(1, 1.12, 0.82);
+    mask.position.set(0, 0.35, 0.95);
+    group.add(mask);
+
+    // Stirn-/Kinnkante für mehr Maskencharakter
+    const browMat = new THREE.MeshStandardMaterial({
+      color: 0x6b4f1c,
+      roughness: 0.3,
+      metalness: 0.9,
+      flatShading: true,
+    });
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.32, 0.5), browMat);
+    brow.position.set(0, 0.92, 1.55);
+    group.add(brow);
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x39ff6a });
+    const eyeGeo = new THREE.BoxGeometry(0.42, 0.18, 0.14);
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.5, 0.42, 1.78);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.5;
+    group.add(eyeL, eyeR);
+
+    const eyeLight = new THREE.PointLight(0x39ff6a, 2.6, 16, 2);
+    eyeLight.position.set(0, 0.42, 2.1);
+    group.add(eyeLight);
+
+    const clickTargets = [];
+    group.traverse((o) => {
+      if (o.isMesh) {
+        o.userData.id = "doomsday";
+        clickTargets.push(o);
+      }
+    });
+
+    group.scale.setScalar(2.2);
+    group.position.set(-25, 13, -8);
+    group.rotation.y = 0.45;
+
+    return { group, eyeLight, clickTargets };
+  }
+  const doomFigure = createDoomFigure();
+  scene.add(doomFigure.group);
+
   // ---------- HTML labels ----------
   const labelEls = {};
   planetObjects.forEach((p) => {
@@ -231,7 +399,7 @@
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const meshes = planetObjects.map((p) => p.mesh);
+    const meshes = planetObjects.map((p) => p.mesh).concat(doomFigure.clickTargets);
     const hits = raycaster.intersectObjects(meshes);
     if (hits.length > 0) {
       selectUniverse(hits[0].object.userData.id);
@@ -264,7 +432,10 @@
 
   document.getElementById("panel-close").addEventListener("click", deselect);
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") deselect();
+    if (e.key === "Escape") {
+      deselect();
+      document.getElementById("travel-overlay").classList.add("hidden");
+    }
   });
 
   // ---------- Countdown ----------
@@ -403,6 +574,10 @@
     camera.lookAt(camTarget);
 
     starfield.rotation.y += dt * 0.004;
+
+    doomFigure.group.rotation.y = 0.45 + Math.sin(t * 0.15) * 0.3;
+    doomFigure.group.position.y = 13 + Math.sin(t * 0.4) * 0.5;
+    doomFigure.eyeLight.intensity = 2.6 + Math.sin(t * 3) * 0.9;
 
     updateLabels();
     renderer.render(scene, camera);

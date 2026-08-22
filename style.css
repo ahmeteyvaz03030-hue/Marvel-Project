@@ -360,7 +360,312 @@ html, body {
 #panel::-webkit-scrollbar { width: 8px; }
 #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
+/* ---------- User gate (Profilauswahl) ---------- */
+#user-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.92), rgba(2, 2, 8, 0.98));
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#user-gate.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gate-card-wrap {
+  text-align: center;
+  max-width: 640px;
+  padding: 20px;
+}
+
+.gate-eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.gate-card-wrap h2 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 34px);
+  margin: 0 0 8px;
+  color: #fff;
+}
+
+.gate-card-wrap > p {
+  color: var(--text-dim);
+  margin: 0 0 34px;
+  font-size: 15px;
+}
+
+#gate-cards {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.gate-card {
+  width: 190px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 16px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--font-body);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.gate-card:hover,
+.gate-card:focus-visible {
+  transform: translateY(-6px);
+  border-color: var(--hero-color, var(--accent));
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 12px 30px -8px var(--hero-color, var(--accent));
+}
+
+.gate-avatar {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08), 0 0 22px -4px var(--hero-color, var(--accent));
+}
+
+.gate-avatar svg { width: 100%; height: 100%; display: block; }
+
+.gate-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.gate-hero {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+/* ---------- Profile badge ---------- */
+#profile-badge {
+  position: fixed;
+  top: 24px;
+  right: 26px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 11, 20, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 6px 10px 6px 6px;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#profile-badge.hidden { opacity: 0; visibility: hidden; }
+
+#profile-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--hero-color, var(--accent));
+  flex-shrink: 0;
+}
+
+#profile-avatar svg { width: 100%; height: 100%; display: block; }
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.profile-meta span {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  color: #fff;
+}
+
+.profile-meta small {
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+#profile-switch {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s ease, transform 0.3s ease;
+}
+
+#profile-switch:hover {
+  background: rgba(255,255,255,0.16);
+  transform: rotate(180deg);
+}
+
+/* ---------- Marvel Travel ---------- */
+#travel-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 26px;
+  z-index: 6;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255,77,77,0.25), rgba(90,60,255,0.2));
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 30px;
+  padding: 12px 20px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#travel-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 26px -8px rgba(255,77,77,0.5);
+}
+
+#travel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(2, 2, 8, 0.86);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+#travel-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#travel-panel {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 34px 32px 40px;
+}
+
+#travel-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+#travel-panel h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  margin: 8px 0 10px;
+  color: #fff;
+}
+
+.travel-sub {
+  color: var(--text-dim);
+  font-size: 14.5px;
+  margin-bottom: 26px;
+  max-width: 560px;
+}
+
+.travel-phase { margin-bottom: 22px; }
+
+.travel-phase h3 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+.travel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+  padding-left: 16px;
+}
+
+.travel-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  padding: 6px 0;
+}
+
+.travel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6a75b0;
+  position: absolute;
+  left: -21px;
+}
+
+.travel-year {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--text-dim);
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.travel-title { font-size: 14.5px; }
+
+.travel-item.finale {
+  animation: pulse 2.2s ease-in-out infinite;
+}
+
+.travel-item.finale .travel-dot {
+  background: #ff5a3c;
+  box-shadow: 0 0 10px 3px rgba(255, 90, 60, 0.7);
+}
+
+.travel-item.finale .travel-title {
+  color: #ff8a6b;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   #panel { width: 100%; }
   .title { letter-spacing: 3px; }
+  #travel-btn { bottom: 20px; right: 16px; padding: 10px 16px; font-size: 11px; }
+  #profile-badge { top: 16px; right: 16px; }
+  #gate-cards { gap: 14px; }
+  .gate-card { width: 140px; padding: 16px 10px; }
 }

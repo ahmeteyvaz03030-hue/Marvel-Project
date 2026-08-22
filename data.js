@@ -1,3 +1,105 @@
+// Auswählbare Benutzer-Avatare (stilisierte Icons statt echter Schauspielerfotos).
+const AVATARS = {
+  ahmet: {
+    name: "Ahmet",
+    hero: "Steve Rogers / Captain America",
+    color: "#3b5bdb",
+    svg: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="48" fill="#a5121b"/>
+      <circle cx="50" cy="50" r="37" fill="#eef0f4"/>
+      <circle cx="50" cy="50" r="26" fill="#1b3d8f"/>
+      <circle cx="50" cy="50" r="12" fill="#eef0f4"/>
+      <polygon points="50,36 54,46 65,46 56,53 59,64 50,57 41,64 44,53 35,46 46,46" fill="#1b3d8f"/>
+    </svg>`,
+  },
+  burak: {
+    name: "Burak",
+    hero: "Tony Stark / Iron Man",
+    color: "#c9962f",
+    svg: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 4C74 4 86 22 86 46 86 70 74 92 50 98 26 92 14 70 14 46 14 22 26 4 50 4Z" fill="#7a0f14"/>
+      <path d="M50 10C70 10 78 26 78 46 78 66 68 86 50 92 32 86 22 66 22 46 22 26 30 10 50 10Z" fill="#c9962f"/>
+      <path d="M50 16C66 16 72 30 72 46 72 62 64 80 50 86 36 80 28 62 28 46 28 30 34 16 50 16Z" fill="#a5121b"/>
+      <path d="M34 42 46 40 46 48 36 50Z" fill="#eaffff"/>
+      <path d="M66 42 54 40 54 48 64 50Z" fill="#eaffff"/>
+      <rect x="46" y="55" width="8" height="24" rx="3" fill="#c9962f"/>
+      <path d="M38 76Q50 87 62 76L62 82Q50 91 38 82Z" fill="#c9962f"/>
+    </svg>`,
+  },
+};
+
+// Alle MCU-Filme in chronologischer Erscheinungsreihenfolge, bis Avengers: Doomsday.
+const MCU_TIMELINE = [
+  {
+    phase: "Phase 1",
+    films: [
+      { title: "Iron Man", year: 2008 },
+      { title: "Der unglaubliche Hulk", year: 2008 },
+      { title: "Iron Man 2", year: 2010 },
+      { title: "Thor", year: 2011 },
+      { title: "Captain America: The First Avenger", year: 2011 },
+      { title: "The Avengers", year: 2012 },
+    ],
+  },
+  {
+    phase: "Phase 2",
+    films: [
+      { title: "Iron Man 3", year: 2013 },
+      { title: "Thor: The Dark World", year: 2013 },
+      { title: "Captain America: The Return of the First Avenger", year: 2014 },
+      { title: "Guardians of the Galaxy", year: 2014 },
+      { title: "Avengers: Age of Ultron", year: 2015 },
+      { title: "Ant-Man", year: 2015 },
+    ],
+  },
+  {
+    phase: "Phase 3",
+    films: [
+      { title: "Captain America: Civil War", year: 2016 },
+      { title: "Doctor Strange", year: 2016 },
+      { title: "Guardians of the Galaxy Vol. 2", year: 2017 },
+      { title: "Spider-Man: Homecoming", year: 2017 },
+      { title: "Thor: Ragnarok", year: 2017 },
+      { title: "Black Panther", year: 2018 },
+      { title: "Avengers: Infinity War", year: 2018 },
+      { title: "Ant-Man and the Wasp", year: 2018 },
+      { title: "Captain Marvel", year: 2019 },
+      { title: "Avengers: Endgame", year: 2019 },
+      { title: "Spider-Man: Far From Home", year: 2019 },
+    ],
+  },
+  {
+    phase: "Phase 4",
+    films: [
+      { title: "Black Widow", year: 2021 },
+      { title: "Shang-Chi and the Legend of the Ten Rings", year: 2021 },
+      { title: "Eternals", year: 2021 },
+      { title: "Spider-Man: No Way Home", year: 2021 },
+      { title: "Doctor Strange in the Multiverse of Madness", year: 2022 },
+      { title: "Thor: Love and Thunder", year: 2022 },
+      { title: "Black Panther: Wakanda Forever", year: 2022 },
+    ],
+  },
+  {
+    phase: "Phase 5",
+    films: [
+      { title: "Ant-Man and the Wasp: Quantumania", year: 2023 },
+      { title: "Guardians of the Galaxy Vol. 3", year: 2023 },
+      { title: "The Marvels", year: 2023 },
+      { title: "Deadpool & Wolverine", year: 2024 },
+    ],
+  },
+  {
+    phase: "Phase 6",
+    films: [
+      { title: "Captain America: Brave New World", year: 2025 },
+      { title: "Thunderbolts*", year: 2025 },
+      { title: "The Fantastic Four: First Steps", year: 2025 },
+      { title: "Avengers: Doomsday", year: 2026, finale: true },
+    ],
+  },
+];
+
 // Datengrundlage für alle Marvel-Universen, die als Planeten dargestellt werden.
 const UNIVERSES = [
   {
