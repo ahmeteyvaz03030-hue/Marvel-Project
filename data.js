@@ -979,4 +979,56 @@ const UNIVERSES = [
     ],
     movies: [{ title: "Avengers: Doomsday", year: 2026 }],
   },
+  {
+    id: "titan",
+    name: "Titan — Thanos' Reich",
+    eyebrow: "Universum · Das tote Homeworld",
+    colorA: "#4a3a2c",
+    colorB: "#8a2e14",
+    accent: "#ff6a3c",
+    radius: 2.0,
+    orbitRadius: 57,
+    orbitSpeed: 0.016,
+    startAngle: 4.6,
+    yOffset: -0.4,
+    isTitan: true,
+    desc: "Thanos' Heimatwelt, die er selbst als Vorbild für sein Weltbild dem Untergang weihte, lange bevor er den Rest des Universums damit bedrohte. Auf ihren Ruinen stellten sich Iron Man, Doctor Strange, Spider-Man und die Guardians dem Mad Titan im entscheidenden Kampf um den Zeitstein.",
+    characters: [
+      {
+        name: "Thanos",
+        role: "Josh Brolin",
+        bio: "Der \"Mad Titan\" von Titan, überzeugt, dass nur die Auslöschung der Hälfte allen Lebens im Universum dessen Überleben sichern kann — der mächtigste Widersacher der Infinity Saga.",
+        films: [
+          { title: "Guardians of the Galaxy", year: 2014, note: "Kurzer Cameo" },
+          { title: "Avengers: Infinity War", year: 2018, note: "Hauptantagonist, Schlacht auf Titan im Mittelteil" },
+          { title: "Avengers: Endgame", year: 2019, note: "Hauptantagonist, stirbt im Finale" },
+        ],
+      },
+      {
+        name: "Nebula",
+        role: "Karen Gillan",
+        bio: "Thanos' von ihm selbst kybernetisch \"verbesserte\" Adoptivtochter und Gamoras Schwester, die sich nach jahrelanger Rivalität endgültig gegen ihren Vater wendet.",
+        films: [
+          { title: "Guardians of the Galaxy", year: 2014, note: "Nebenrolle" },
+          { title: "Guardians of the Galaxy Vol. 2", year: 2017, note: "Nebenrolle" },
+          { title: "Avengers: Infinity War", year: 2018, note: "Hauptrolle, Schlacht auf Titan" },
+          { title: "Avengers: Endgame", year: 2019, note: "Hauptrolle" },
+        ],
+      },
+    ],
+    movies: [
+      { title: "Avengers: Infinity War", year: 2018 },
+      { title: "Avengers: Endgame", year: 2019 },
+    ],
+  },
+];
+
+// Die sechs Infinity-Steine als Sammel-Easter-Egg, versteckt im 3D-Raum.
+const INFINITY_STONES = [
+  { id: "space", name: "Weltraumstein", color: 0x2e6bff, position: [42, 7, 18] },
+  { id: "mind", name: "Verstandesstein", color: 0xffd23c, position: [-20, -7, 28] },
+  { id: "reality", name: "Realitätsstein", color: 0xff3c3c, position: [12, 22, -38] },
+  { id: "power", name: "Machtstein", color: 0x8a2be2, position: [-42, 5, -16] },
+  { id: "time", name: "Zeitstein", color: 0x2ecc71, position: [26, -11, 36] },
+  { id: "soul", name: "Seelenstein", color: 0xff8c1a, position: [-9, 19, 16] },
 ];

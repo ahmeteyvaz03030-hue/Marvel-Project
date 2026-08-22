@@ -6,6 +6,211 @@
   const panel = document.getElementById("panel");
   const hint = document.getElementById("hint");
 
+  let currentUser = null;
+
+  // ---------- Sound (synthetisiert per Web Audio API, keine externen Dateien) ----------
+  function initSound() {
+    let ctx = null;
+    let masterGain = null;
+    let ambientStarted = false;
+    let muted = false;
+    try {
+      muted = localStorage.getItem("marvelMuted") === "1";
+    } catch (e) {
+      muted = false;
+    }
+
+    function ensureCtx() {
+      if (ctx) return ctx;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = muted ? 0 : 0.35;
+      masterGain.connect(ctx.destination);
+      return ctx;
+    }
+
+    function startAmbient() {
+      if (!ensureCtx() || ambientStarted) return;
+      ambientStarted = true;
+      [55, 82.5, 110].forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = 0.05 + i * 0.01;
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.05 + i * 0.02;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.02;
+        lfo.connect(lfoGain);
+        lfoGain.connect(g.gain);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start();
+        lfo.start();
+      });
+    }
+
+    function blip(freq, duration, type, peak) {
+      if (muted || !ensureCtx()) return;
+      const osc = ctx.createOscillator();
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(peak || 0.25, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      osc.connect(g);
+      g.connect(masterGain);
+      osc.start();
+      osc.stop(ctx.currentTime + duration + 0.05);
+    }
+
+    function playClick() {
+      blip(660, 0.12, "triangle", 0.18);
+    }
+
+    function playWhoosh() {
+      if (muted || !ensureCtx()) return;
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(120, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(480, ctx.currentTime + 0.4);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 900;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+      osc.connect(filter);
+      filter.connect(g);
+      g.connect(masterGain);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.55);
+    }
+
+    function playCollect() {
+      blip(880, 0.3, "sine", 0.3);
+      setTimeout(() => blip(1320, 0.35, "sine", 0.25), 90);
+    }
+
+    function playPower() {
+      if (muted || !ensureCtx()) return;
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(100, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(700, ctx.currentTime + 1.1);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.5);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+      osc.connect(g);
+      g.connect(masterGain);
+      osc.start();
+      osc.stop(ctx.currentTime + 1.25);
+    }
+
+    function setMuted(v) {
+      muted = v;
+      try {
+        localStorage.setItem("marvelMuted", v ? "1" : "0");
+      } catch (e) {
+        /* ignore */
+      }
+      if (masterGain) masterGain.gain.value = v ? 0 : 0.35;
+    }
+
+    return { ensureCtx, startAmbient, playClick, playWhoosh, playCollect, playPower, setMuted, isMuted: () => muted };
+  }
+  const Sound = initSound();
+
+  // Startet den Ambient-Sound beim ersten Nutzer-Klick (Browser-Autoplay-Policy).
+  function unlockAudioOnce() {
+    Sound.ensureCtx();
+    Sound.startAmbient();
+    document.removeEventListener("pointerdown", unlockAudioOnce);
+  }
+  document.addEventListener("pointerdown", unlockAudioOnce);
+
+  const soundToggleBtn = document.getElementById("sound-toggle");
+  soundToggleBtn.textContent = Sound.isMuted() ? "🔇" : "🔊";
+  soundToggleBtn.addEventListener("click", () => {
+    const nowMuted = !Sound.isMuted();
+    Sound.setMuted(nowMuted);
+    soundToggleBtn.textContent = nowMuted ? "🔇" : "🔊";
+  });
+
+  // ---------- Toast-Benachrichtigungen ----------
+  function showToast(msg, duration) {
+    const layer = document.getElementById("toast-layer");
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    layer.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("show"));
+    setTimeout(() => {
+      el.classList.remove("show");
+      setTimeout(() => el.remove(), 400);
+    }, duration || 3200);
+  }
+
+  // ---------- Suchindex (gemeinsam für Suche, Favoriten & Vergleich) ----------
+  function buildSearchIndex() {
+    const index = [];
+    UNIVERSES.forEach((u) => {
+      u.characters.forEach((c) => {
+        index.push({
+          type: "character",
+          label: c.name,
+          sub: `${c.role} · ${u.name}`,
+          universe: u,
+          character: c,
+        });
+      });
+      u.movies.forEach((m) => {
+        index.push({
+          type: "movie",
+          label: m.title,
+          sub: `${m.year} · ${u.name}`,
+          universe: u,
+        });
+      });
+    });
+    return index;
+  }
+  const SEARCH_INDEX = buildSearchIndex();
+
+  // ---------- Favoriten (pro Profil in localStorage gespeichert) ----------
+  function getFavorites() {
+    try {
+      return JSON.parse(localStorage.getItem(`marvelFavorites_${currentUser || "guest"}`) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+  function setFavorites(arr) {
+    try {
+      localStorage.setItem(`marvelFavorites_${currentUser || "guest"}`, JSON.stringify(arr));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  function isFavorite(uid, name) {
+    return getFavorites().includes(`${uid}::${name}`);
+  }
+  function toggleFavorite(uid, name) {
+    const key = `${uid}::${name}`;
+    const favs = getFavorites();
+    const idx = favs.indexOf(key);
+    if (idx === -1) favs.push(key);
+    else favs.splice(idx, 1);
+    setFavorites(favs);
+    return idx === -1;
+  }
+
   // ---------- User gate (Profilauswahl) ----------
   function initUserGate() {
     const gate = document.getElementById("user-gate");
@@ -26,6 +231,7 @@
     function applyUser(id) {
       const u = AVATARS[id];
       if (!u) return;
+      currentUser = id;
       document.getElementById("profile-avatar").innerHTML = u.svg;
       document.getElementById("profile-name").textContent = u.name;
       document.getElementById("profile-hero").textContent = u.hero;
@@ -38,6 +244,9 @@
       localStorage.setItem("marvelUser", id);
       applyUser(id);
       gate.classList.add("hidden");
+      Sound.ensureCtx();
+      Sound.startAmbient();
+      Sound.playPower();
     }
 
     let saved = null;
@@ -86,38 +295,17 @@
       container.appendChild(phaseEl);
     });
 
-    btn.addEventListener("click", () => overlay.classList.remove("hidden"));
+    btn.addEventListener("click", () => {
+      overlay.classList.remove("hidden");
+      Sound.playClick();
+    });
     closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
   }
   initTravel();
 
   // ---------- Suche (Charaktere & Filme) ----------
-  function buildSearchIndex() {
-    const index = [];
-    UNIVERSES.forEach((u) => {
-      u.characters.forEach((c) => {
-        index.push({
-          type: "character",
-          label: c.name,
-          sub: `${c.role} · ${u.name}`,
-          universe: u,
-          character: c,
-        });
-      });
-      u.movies.forEach((m) => {
-        index.push({
-          type: "movie",
-          label: m.title,
-          sub: `${m.year} · ${u.name}`,
-          universe: u,
-        });
-      });
-    });
-    return index;
-  }
-
   function initSearch() {
-    const searchIndex = buildSearchIndex();
+    const searchIndex = SEARCH_INDEX;
     const wrap = document.getElementById("search-wrap");
     const input = document.getElementById("search-input");
     const results = document.getElementById("search-results");
@@ -142,7 +330,7 @@
         item.addEventListener("click", () => {
           selectUniverse(m.universe.id);
           if (m.type === "character") {
-            setTimeout(() => openCharacterModal(m.character, m.universe.accent), 300);
+            setTimeout(() => openCharacterModal(m.character, m.universe), 300);
           }
           input.value = "";
           results.classList.add("hidden");
@@ -170,6 +358,143 @@
     });
   }
   initSearch();
+
+  // ---------- Favoriten-Sammlung ----------
+  function renderFavoritesList() {
+    const list = document.getElementById("favorites-list");
+    const empty = document.getElementById("favorites-empty");
+    const favs = getFavorites();
+    list.innerHTML = "";
+    if (favs.length === 0) {
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    favs.forEach((key) => {
+      const sep = key.indexOf("::");
+      const uid = key.slice(0, sep);
+      const name = key.slice(sep + 2);
+      const entry = SEARCH_INDEX.find((e) => e.type === "character" && e.universe.id === uid && e.character.name === name);
+      if (!entry) return;
+      const row = document.createElement("div");
+      row.className = "favorite-item";
+      row.style.setProperty("--accent-color", entry.universe.accent);
+      row.innerHTML = `
+        <div class="avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
+        <div class="info">
+          <span class="fname">${entry.character.name}</span>
+          <span class="funiverse">${entry.universe.name}</span>
+        </div>
+        <button class="fav-heart active" type="button" title="Entfernen">♥</button>`;
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".fav-heart")) return;
+        selectUniverse(uid);
+        setTimeout(() => openCharacterModal(entry.character, entry.universe), 300);
+        document.getElementById("favorites-overlay").classList.add("hidden");
+      });
+      row.querySelector(".fav-heart").addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFavorite(uid, name);
+        Sound.playClick();
+        renderFavoritesList();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function initFavorites() {
+    const btn = document.getElementById("favorites-btn");
+    const overlay = document.getElementById("favorites-overlay");
+    const closeBtn = document.getElementById("favorites-close");
+    btn.addEventListener("click", () => {
+      renderFavoritesList();
+      overlay.classList.remove("hidden");
+      Sound.playClick();
+    });
+    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+  }
+  initFavorites();
+
+  // ---------- Charakter-Vergleich ----------
+  function initCompare() {
+    const btn = document.getElementById("compare-btn");
+    const overlay = document.getElementById("compare-overlay");
+    const closeBtn = document.getElementById("compare-close");
+    const resultEl = document.getElementById("compare-result");
+    const picked = { a: null, b: null };
+
+    function renderComparison() {
+      if (!picked.a || !picked.b) {
+        resultEl.innerHTML = "";
+        return;
+      }
+      const card = (entry) => {
+        const films = entry.character.films || [];
+        const firstYear = films.length ? Math.min(...films.map((f) => f.year)) : "–";
+        return `
+          <div class="compare-card" style="--accent-color:${entry.universe.accent}">
+            <div class="compare-avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
+            <h3>${entry.character.name}</h3>
+            <div class="compare-role">${entry.character.role}</div>
+            <div class="compare-universe">${entry.universe.name}</div>
+            <div class="compare-stat"><span>Filmauftritte</span><strong>${films.length}</strong></div>
+            <div class="compare-stat"><span>Erstauftritt</span><strong>${firstYear}</strong></div>
+          </div>`;
+      };
+      resultEl.innerHTML = `${card(picked.a)}<div class="compare-vs">VS</div>${card(picked.b)}`;
+    }
+
+    function makePicker(inputId, resultsId, slot) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      input.addEventListener("input", () => {
+        const q = input.value.trim().toLowerCase();
+        results.innerHTML = "";
+        if (!q) {
+          results.classList.add("hidden");
+          return;
+        }
+        const matches = SEARCH_INDEX.filter((e) => e.type === "character" && e.label.toLowerCase().includes(q)).slice(0, 8);
+        if (!matches.length) {
+          results.innerHTML = `<div class="search-empty">Keine Treffer</div>`;
+          results.classList.remove("hidden");
+          return;
+        }
+        matches.forEach((m) => {
+          const item = document.createElement("div");
+          item.className = "search-item";
+          item.style.setProperty("--accent-color", m.universe.accent);
+          item.innerHTML = `
+            <span class="search-tag">★</span>
+            <div class="search-text">
+              <span class="search-label">${m.label}</span>
+              <span class="search-sub">${m.sub}</span>
+            </div>`;
+          item.addEventListener("click", () => {
+            picked[slot] = m;
+            input.value = m.label;
+            results.classList.add("hidden");
+            Sound.playClick();
+            renderComparison();
+          });
+          results.appendChild(item);
+        });
+        results.classList.remove("hidden");
+      });
+      document.addEventListener("pointerdown", (e) => {
+        if (!input.parentElement.contains(e.target)) results.classList.add("hidden");
+      });
+    }
+    makePicker("compare-input-a", "compare-results-a", "a");
+    makePicker("compare-input-b", "compare-results-b", "b");
+
+    btn.addEventListener("click", () => {
+      overlay.classList.remove("hidden");
+      Sound.playClick();
+    });
+    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+  }
+  initCompare();
 
   // ---------- Renderer / Scene / Camera ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
@@ -347,7 +672,7 @@
     group.add(new THREE.Mesh(glowGeo, glowMat));
 
     // ring for a few "special" planets
-    if (u.id === "fantasticfour" || u.id === "xmen" || u.id === "doomsday") {
+    if (u.id === "fantasticfour" || u.id === "xmen" || u.id === "doomsday" || u.id === "titan") {
       const ringGeo = new THREE.RingGeometry(u.radius * 1.5, u.radius * 2.1, 64);
       const ringMat = new THREE.MeshBasicMaterial({
         color: new THREE.Color(u.accent),
@@ -486,6 +811,115 @@
   const doomFigure = createDoomFigure();
   scene.add(doomFigure.group);
 
+  // ---------- Infinity-Steine (Sammel-Easter-Egg) ----------
+  function stonesStorageKey() {
+    return `marvelStones_${currentUser || "guest"}`;
+  }
+  function getCollectedStones() {
+    try {
+      return JSON.parse(localStorage.getItem(stonesStorageKey()) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+  function setCollectedStones(arr) {
+    try {
+      localStorage.setItem(stonesStorageKey(), JSON.stringify(arr));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  function renderStonesTracker() {
+    const el = document.getElementById("stones-tracker");
+    const collected = getCollectedStones();
+    el.innerHTML = "";
+    INFINITY_STONES.forEach((s) => {
+      const dot = document.createElement("div");
+      dot.className = "stone-dot" + (collected.includes(s.id) ? " collected" : "");
+      dot.style.setProperty("--stone-color", "#" + s.color.toString(16).padStart(6, "0"));
+      dot.title = s.name;
+      el.appendChild(dot);
+    });
+    el.classList.remove("hidden");
+  }
+
+  function createInfinityStones() {
+    const collected = getCollectedStones();
+    const group = new THREE.Group();
+    const stoneMeshes = [];
+    INFINITY_STONES.forEach((s) => {
+      if (collected.includes(s.id)) return;
+      const geo = new THREE.OctahedronGeometry(0.6, 0);
+      const mat = new THREE.MeshStandardMaterial({
+        color: s.color,
+        emissive: s.color,
+        emissiveIntensity: 1.1,
+        metalness: 0.2,
+        roughness: 0.25,
+        flatShading: true,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(s.position[0], s.position[1], s.position[2]);
+      mesh.userData.stoneId = s.id;
+      mesh.userData.basePos = mesh.position.clone();
+      mesh.userData.phase = Math.random() * Math.PI * 2;
+      const light = new THREE.PointLight(s.color, 1.8, 12, 2);
+      mesh.add(light);
+      group.add(mesh);
+      stoneMeshes.push(mesh);
+    });
+    scene.add(group);
+    return { group, stoneMeshes };
+  }
+  const infinityStones = createInfinityStones();
+  renderStonesTracker();
+
+  function collectStone(mesh) {
+    const stoneId = mesh.userData.stoneId;
+    const stoneData = INFINITY_STONES.find((s) => s.id === stoneId);
+    const collected = getCollectedStones();
+    if (!collected.includes(stoneId)) collected.push(stoneId);
+    setCollectedStones(collected);
+    infinityStones.group.remove(mesh);
+    const idx = infinityStones.stoneMeshes.indexOf(mesh);
+    if (idx !== -1) infinityStones.stoneMeshes.splice(idx, 1);
+    Sound.playCollect();
+    showToast(`💎 ${stoneData.name} gesammelt! (${collected.length}/${INFINITY_STONES.length})`);
+    renderStonesTracker();
+    if (collected.length >= INFINITY_STONES.length) {
+      setTimeout(() => {
+        Sound.playPower();
+        document.getElementById("snap-overlay").classList.remove("hidden");
+      }, 600);
+    }
+  }
+
+  document.getElementById("snap-close").addEventListener("click", () => {
+    document.getElementById("snap-overlay").classList.add("hidden");
+  });
+
+  // ---------- Achievement: alle Universen besucht ----------
+  function recordVisit(id) {
+    const key = `marvelVisited_${currentUser || "guest"}`;
+    let visited = [];
+    try {
+      visited = JSON.parse(localStorage.getItem(key) || "[]");
+    } catch (e) {
+      visited = [];
+    }
+    if (!visited.includes(id)) {
+      visited.push(id);
+      try {
+        localStorage.setItem(key, JSON.stringify(visited));
+      } catch (e) {
+        /* ignore */
+      }
+      if (visited.length === UNIVERSES.length) {
+        showToast("🏆 Achievement freigeschaltet: Multiversum-Entdecker — alle Universen besucht!");
+      }
+    }
+  }
+
   // ---------- HTML labels ----------
   const labelEls = {};
   planetObjects.forEach((p) => {
@@ -506,6 +940,13 @@
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
+
+    const stoneHits = raycaster.intersectObjects(infinityStones.stoneMeshes);
+    if (stoneHits.length > 0) {
+      collectStone(stoneHits[0].object);
+      return;
+    }
+
     const meshes = planetObjects.map((p) => p.mesh).concat(doomFigure.clickTargets);
     const hits = raycaster.intersectObjects(meshes);
     if (hits.length > 0) {
@@ -521,6 +962,8 @@
     if (!p) return;
     activeId = id;
     hint.style.display = "none";
+    Sound.playWhoosh();
+    recordVisit(id);
 
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));
     labelEls[id].classList.add("active");
@@ -543,6 +986,9 @@
       deselect();
       document.getElementById("travel-overlay").classList.add("hidden");
       document.getElementById("character-modal").classList.add("hidden");
+      document.getElementById("favorites-overlay").classList.add("hidden");
+      document.getElementById("compare-overlay").classList.add("hidden");
+      document.getElementById("snap-overlay").classList.add("hidden");
     }
   });
 
@@ -598,7 +1044,9 @@
     </svg>`;
   }
 
-  function openCharacterModal(c, accent) {
+  function openCharacterModal(c, universe) {
+    Sound.playClick();
+    const accent = universe.accent;
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
     document.getElementById("character-avatar").innerHTML = characterFigureSVG(accent, getInitials(c.name));
@@ -606,6 +1054,19 @@
     document.getElementById("character-role").textContent = c.role;
     document.getElementById("character-bio").textContent =
       c.bio || "Zu diesem Charakter liegt noch kein ausführlicher Steckbrief vor.";
+
+    const favBtn = document.getElementById("character-fav");
+    const syncFav = () => {
+      const active = isFavorite(universe.id, c.name);
+      favBtn.textContent = active ? "♥" : "♡";
+      favBtn.classList.toggle("active", active);
+    };
+    syncFav();
+    favBtn.onclick = () => {
+      toggleFavorite(universe.id, c.name);
+      Sound.playClick();
+      syncFav();
+    };
 
     const filmsList = document.getElementById("character-films");
     filmsList.innerHTML = "";
@@ -647,13 +1108,23 @@
     charList.innerHTML = "";
     u.characters.forEach((c) => {
       const li = document.createElement("li");
+      const favActive = isFavorite(u.id, c.name);
       li.innerHTML = `
         <div class="avatar">${characterFigureSVG(u.accent, getInitials(c.name))}</div>
         <div class="info">
           <span class="cname">${c.name}</span>
           <span class="crole">${c.role}</span>
-        </div>`;
-      li.addEventListener("click", () => openCharacterModal(c, u.accent));
+        </div>
+        <button class="fav-heart${favActive ? " active" : ""}" type="button" title="Favorit">${favActive ? "♥" : "♡"}</button>`;
+      li.addEventListener("click", () => openCharacterModal(c, u));
+      const heart = li.querySelector(".fav-heart");
+      heart.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const nowFav = toggleFavorite(u.id, c.name);
+        heart.textContent = nowFav ? "♥" : "♡";
+        heart.classList.toggle("active", nowFav);
+        Sound.playClick();
+      });
       charList.appendChild(li);
     });
 
@@ -736,6 +1207,12 @@
     doomFigure.group.rotation.y = 0.45 + Math.sin(t * 0.15) * 0.3;
     doomFigure.group.position.y = 12 + Math.sin(t * 0.4) * 0.5;
     doomFigure.eyeLight.intensity = 2.6 + Math.sin(t * 3) * 0.9;
+
+    infinityStones.stoneMeshes.forEach((m) => {
+      m.rotation.x += dt * 0.6;
+      m.rotation.y += dt * 0.8;
+      m.position.y = m.userData.basePos.y + Math.sin(t * 0.8 + m.userData.phase) * 0.6;
+    });
 
     updateLabels();
     renderer.render(scene, camera);

@@ -604,12 +604,134 @@ html, body {
   transform: rotate(180deg);
 }
 
-/* ---------- Marvel Travel ---------- */
-#travel-btn {
+#sound-toggle {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#sound-toggle:hover { background: rgba(255,255,255,0.16); transform: scale(1.1); }
+
+/* ---------- Infinity-Steine Tracker ---------- */
+#stones-tracker {
+  position: fixed;
+  top: 66px;
+  right: 26px;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  background: rgba(10, 11, 20, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 10px;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#stones-tracker.hidden { opacity: 0; visibility: hidden; }
+
+.stone-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  transition: box-shadow 0.3s ease, background 0.3s ease, transform 0.3s ease;
+}
+
+.stone-dot.collected {
+  background: var(--stone-color);
+  box-shadow: 0 0 10px 2px var(--stone-color);
+  transform: scale(1.1);
+}
+
+/* ---------- Toasts ---------- */
+#toast-layer {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(10, 11, 20, 0.92);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 30px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  color: #fff;
+  box-shadow: 0 8px 24px -6px rgba(0,0,0,0.5);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  white-space: nowrap;
+}
+
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ---------- Snap-Overlay (alle Steine gesammelt) ---------- */
+#snap-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#snap-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+#snap-content { max-width: 480px; padding: 20px; }
+
+#snap-glove { font-size: 52px; margin-bottom: 14px; filter: drop-shadow(0 0 20px rgba(255,196,0,0.6)); }
+
+#snap-content h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: #fff;
+  margin: 0 0 12px;
+}
+
+#snap-content p { color: var(--text-dim); margin-bottom: 22px; font-size: 15px; }
+
+#snap-close {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255,77,77,0.3), rgba(90,60,255,0.25));
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 30px;
+  padding: 12px 26px;
+  cursor: pointer;
+}
+
+/* ---------- Bottom action bar (Vergleichen / Favoriten / Marvel Travel) ---------- */
+#bottom-actions {
   position: fixed;
   bottom: 28px;
   right: 26px;
   z-index: 6;
+  display: flex;
+  gap: 10px;
+}
+
+#bottom-actions button {
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 1.5px;
@@ -623,7 +745,7 @@ html, body {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-#travel-btn:hover {
+#bottom-actions button:hover {
   transform: translateY(-3px);
   box-shadow: 0 10px 26px -8px rgba(255,77,77,0.5);
 }
@@ -749,12 +871,232 @@ html, body {
 .character-list li {
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  position: relative;
 }
 
 .character-list li:hover {
   background: rgba(255,255,255,0.07);
   border-color: rgba(255,255,255,0.22);
   transform: translateX(3px);
+}
+
+.fav-heart {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.fav-heart:hover { transform: scale(1.2); }
+.fav-heart.active { color: #ff4d6d; }
+
+#character-fav {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  margin-left: 68px;
+  background: rgba(10,11,20,0.7);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+#character-fav.active { color: #ff4d6d; }
+#character-fav:hover { transform: scale(1.1); }
+
+/* ---------- Favoriten / Vergleichen Overlays (teilen das Marvel-Travel-Layout) ---------- */
+#favorites-overlay,
+#compare-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(2, 2, 8, 0.86);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+#favorites-overlay.hidden,
+#compare-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#favorites-panel,
+#compare-panel {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 34px 32px 40px;
+}
+
+#favorites-close,
+#compare-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+#favorites-panel h2,
+#compare-panel h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  margin: 8px 0 18px;
+  color: #fff;
+}
+
+#favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.favorite-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid var(--accent-color, var(--accent));
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.favorite-item:hover { background: rgba(255,255,255,0.07); }
+
+.favorite-item .avatar { width: 38px; height: 38px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
+.favorite-item .avatar svg { width: 100%; height: 100%; display: block; }
+
+.favorite-item .info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.favorite-item .fname { font-size: 14.5px; color: var(--text); }
+.favorite-item .funiverse { font-size: 12px; color: var(--text-dim); }
+
+.favorite-item .fav-heart { margin-left: 0; }
+
+/* Vergleichen */
+#compare-pickers {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.compare-picker-wrap { flex: 1; min-width: 200px; position: relative; }
+
+.compare-picker-wrap input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 10px 16px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.compare-picker-wrap input:focus { border-color: var(--accent); }
+
+.compare-picker-wrap > div {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(10, 11, 20, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.compare-vs-label {
+  font-family: var(--font-display);
+  color: var(--accent);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+#compare-result {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.compare-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 280px;
+  text-align: center;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 16px;
+}
+
+.compare-avatar {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.1), 0 0 24px -4px var(--accent-color, var(--accent));
+}
+
+.compare-avatar svg { width: 100%; height: 100%; display: block; }
+
+.compare-card h3 { font-family: var(--font-display); font-size: 16px; color: #fff; margin: 4px 0; }
+.compare-role { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+.compare-universe { font-size: 11.5px; color: var(--accent-color, var(--accent)); margin-bottom: 14px; }
+
+.compare-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 4px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 13px;
+}
+
+.compare-stat span { color: var(--text-dim); }
+.compare-stat strong { color: #fff; }
+
+.compare-vs {
+  align-self: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--accent);
+  padding-top: 40px;
 }
 
 /* ---------- Character Steckbrief modal ---------- */
@@ -890,8 +1232,12 @@ html, body {
 @media (max-width: 640px) {
   #panel { width: 100%; }
   .title { letter-spacing: 3px; }
-  #travel-btn { bottom: 20px; right: 16px; padding: 10px 16px; font-size: 11px; }
+  #bottom-actions { bottom: 16px; right: 12px; left: 12px; flex-wrap: wrap; justify-content: flex-end; }
+  #bottom-actions button { padding: 9px 14px; font-size: 10.5px; }
   #profile-badge { top: 16px; right: 16px; }
+  #stones-tracker { top: 60px; right: 16px; }
   #gate-cards { gap: 14px; }
   .gate-card { width: 140px; padding: 16px 10px; }
+  #compare-pickers { flex-direction: column; }
+  .compare-vs-label { display: none; }
 }

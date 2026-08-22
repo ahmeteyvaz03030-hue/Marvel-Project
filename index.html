@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -30,7 +30,21 @@
       <span id="profile-name"></span>
       <small id="profile-hero"></small>
     </div>
+    <button id="sound-toggle" title="Sound an/aus">🔊</button>
     <button id="profile-switch" title="Benutzer wechseln">⇄</button>
+  </div>
+
+  <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
+
+  <div id="toast-layer"></div>
+
+  <div id="snap-overlay" class="hidden">
+    <div id="snap-content">
+      <div id="snap-glove">🧤</div>
+      <h2>Perfekt ausbalanciert.</h2>
+      <p>Du hast alle sechs Infinity-Steine gesammelt, wie es sein sollte.</p>
+      <button id="snap-close">Schließen</button>
+    </div>
   </div>
 
   <header id="hud">
@@ -50,7 +64,11 @@
 
   <div id="hint">Klicke einen Planeten, um sein Universum zu betreten</div>
 
-  <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
+  <div id="bottom-actions">
+    <button id="compare-btn">⚔️ <span>VERGLEICHEN</span></button>
+    <button id="favorites-btn">⭐ <span>FAVORITEN</span></button>
+    <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
+  </div>
 
   <div id="travel-overlay" class="hidden">
     <div id="travel-panel">
@@ -59,6 +77,36 @@
       <h2>Marvel Travel — Die MCU-Reise</h2>
       <p class="travel-sub">Alle Filme des Marvel Cinematic Universe in chronologischer Reihenfolge — bis hin zu <strong>Avengers: Doomsday</strong>.</p>
       <div id="travel-timeline"></div>
+    </div>
+  </div>
+
+  <div id="favorites-overlay" class="hidden">
+    <div id="favorites-panel">
+      <button id="favorites-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">SAMMLUNG</div>
+      <h2>Meine Favoriten</h2>
+      <p class="travel-sub" id="favorites-empty">Noch keine Favoriten — klicke das Herz bei einem Charakter, um ihn hier zu sammeln.</p>
+      <div id="favorites-list"></div>
+    </div>
+  </div>
+
+  <div id="compare-overlay" class="hidden">
+    <div id="compare-panel">
+      <button id="compare-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">VERSUS</div>
+      <h2>Charakter-Vergleich</h2>
+      <div id="compare-pickers">
+        <div class="compare-picker-wrap">
+          <input id="compare-input-a" type="text" placeholder="Charakter A suchen…" autocomplete="off">
+          <div id="compare-results-a" class="hidden"></div>
+        </div>
+        <div class="compare-vs-label">VS</div>
+        <div class="compare-picker-wrap">
+          <input id="compare-input-b" type="text" placeholder="Charakter B suchen…" autocomplete="off">
+          <div id="compare-results-b" class="hidden"></div>
+        </div>
+      </div>
+      <div id="compare-result"></div>
     </div>
   </div>
 
@@ -97,6 +145,7 @@
       <button id="character-close" aria-label="Schließen">✕</button>
       <div id="character-banner"></div>
       <div id="character-avatar"></div>
+      <button id="character-fav" title="Zu Favoriten hinzufügen">♡</button>
       <div class="panel-eyebrow" id="character-eyebrow">CHARAKTER</div>
       <h2 id="character-name">—</h2>
       <div id="character-role"></div>
@@ -109,7 +158,7 @@
   </div>
 
   <script src="vendor/three.min.js"></script>
-  <script src="data.js?v=5"></script>
-  <script src="script.js?v=5"></script>
+  <script src="data.js?v=6"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>
