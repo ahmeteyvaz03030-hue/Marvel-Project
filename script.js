@@ -431,6 +431,10 @@
       const card = (entry) => {
         const films = entry.character.films || [];
         const firstYear = films.length ? Math.min(...films.map((f) => f.year)) : "–";
+        const powers = entry.character.powers || [];
+        const powerChips = powers
+          .map((p) => `<span class="power-chip" style="--accent-color:${entry.universe.accent}">${p}</span>`)
+          .join("");
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
@@ -439,6 +443,7 @@
             <div class="compare-universe">${entry.universe.name}</div>
             <div class="compare-stat"><span>Filmauftritte</span><strong>${films.length}</strong></div>
             <div class="compare-stat"><span>Erstauftritt</span><strong>${firstYear}</strong></div>
+            <div class="compare-powers">${powerChips}</div>
           </div>`;
       };
       resultEl.innerHTML = `${card(picked.a)}<div class="compare-vs">VS</div>${card(picked.b)}`;
@@ -1068,6 +1073,16 @@
       syncFav();
     };
 
+    const powersWrap = document.getElementById("character-powers");
+    powersWrap.innerHTML = "";
+    (c.powers || ["Keine Angaben"]).forEach((p) => {
+      const chip = document.createElement("span");
+      chip.className = "power-chip";
+      chip.style.setProperty("--accent-color", accent);
+      chip.textContent = p;
+      powersWrap.appendChild(chip);
+    });
+
     const filmsList = document.getElementById("character-films");
     filmsList.innerHTML = "";
     (c.films || []).forEach((f) => {
@@ -1102,6 +1117,16 @@
     } else {
       countdownBlock.classList.add("hidden");
       clearInterval(countdownInterval);
+    }
+
+    const trailerBlock = document.getElementById("trailer-block");
+    const trailerWrap = document.getElementById("trailer-frame-wrap");
+    if (u.trailerYouTubeId) {
+      trailerWrap.innerHTML = `<iframe src="https://www.youtube.com/embed/${u.trailerYouTubeId}" title="${u.name} Trailer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      trailerBlock.classList.remove("hidden");
+    } else {
+      trailerWrap.innerHTML = "";
+      trailerBlock.classList.add("hidden");
     }
 
     const charList = document.getElementById("panel-characters");

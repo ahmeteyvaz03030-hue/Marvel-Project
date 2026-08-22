@@ -101,7 +101,8 @@ const MCU_TIMELINE = [
 ];
 
 // Datengrundlage für alle Marvel-Universen, die als Planeten dargestellt werden.
-// Jeder Charakter trägt einen kurzen Steckbrief (bio) sowie seine Auftritte (films).
+// Jeder Charakter trägt einen kurzen Steckbrief (bio), seine Kräfte/Eigenschaften
+// (powers) für den Vergleich, sowie seine Auftritte (films).
 // Hinweis: Auf exakte Minutenangaben wird bewusst verzichtet, da sich diese nicht
 // verlässlich belegen lassen — stattdessen gibt "note" die Art des Auftritts an
 // (z.B. Hauptrolle, Cameo, stirbt im Finale).
@@ -124,6 +125,7 @@ const UNIVERSES = [
         name: "Peter Parker / Spider-Man",
         role: "Tobey Maguire",
         bio: "Ein schüchterner Highschool-Fotograf aus Queens, der nach dem Biss einer gentechnisch veränderten Spinne übermenschliche Kräfte erhält. Nach dem Tod seines Onkels Ben lernt er, dass mit großer Kraft große Verantwortung einhergeht, und wird zum Beschützer New Yorks.",
+        powers: ["Übermenschliche Kraft", "Wandkletterfähigkeit", "Spinnensinn", "Organische Netzschützen"],
         films: [
           { title: "Spider-Man", year: 2002, note: "Hauptrolle" },
           { title: "Spider-Man 2", year: 2004, note: "Hauptrolle" },
@@ -135,6 +137,7 @@ const UNIVERSES = [
         name: "Mary Jane Watson",
         role: "Kirsten Dunst",
         bio: "Peters Nachbarin und große Liebe, eine angehende Schauspielerin, die zwischen ihren Gefühlen für Peter und Harry hin- und hergerissen ist und mehrfach von Spider-Man gerettet werden muss.",
+        powers: ["Keine Superkräfte", "Schauspieltalent"],
         films: [
           { title: "Spider-Man", year: 2002, note: "Hauptrolle" },
           { title: "Spider-Man 2", year: 2004, note: "Hauptrolle" },
@@ -145,6 +148,7 @@ const UNIVERSES = [
         name: "Harry Osborn / New Goblin",
         role: "James Franco",
         bio: "Peters bester Freund und Sohn von Norman Osborn. Nach dem Tod seines Vaters übernimmt er dessen Erbe als Goblin und wird zunächst Spider-Mans Feind, bevor er sich am Ende opfert, um seinen Freund zu retten.",
+        powers: ["Goblin-Serum-Stärke", "Gleiter & Kürbisbomben"],
         films: [
           { title: "Spider-Man", year: 2002, note: "Nebenrolle" },
           { title: "Spider-Man 2", year: 2004, note: "entdeckt gegen Filmende Spider-Mans Identität" },
@@ -155,6 +159,7 @@ const UNIVERSES = [
         name: "Norman Osborn / Green Goblin",
         role: "Willem Dafoe",
         bio: "Erfolgreicher Wissenschaftler und Industrieller, der durch ein fehlgeschlagenes Selbstexperiment mit dem Green-Goblin-Serum wahnsinnig wird und zum ersten großen Widersacher Spider-Mans wird.",
+        powers: ["Übermenschliche Kraft", "Gleiter & Kürbisbomben", "Gesteigerte Aggression"],
         films: [
           { title: "Spider-Man", year: 2002, note: "Hauptantagonist, stirbt im Finale" },
           { title: "Spider-Man 3", year: 2007, note: "Erscheint als Erinnerung/Geist, die Harry berät" },
@@ -164,24 +169,28 @@ const UNIVERSES = [
         name: "Otto Octavius / Doc Ock",
         role: "Alfred Molina",
         bio: "Brillanter Fusionsforscher, dessen mechanische Roboterarme sich nach einem Laborunfall mit seinem Nervensystem verschmelzen und ihn zu Doctor Octopus machen.",
+        powers: ["Vier mechanische Roboterarme", "Genie-Intellekt"],
         films: [{ title: "Spider-Man 2", year: 2004, note: "Hauptantagonist des gesamten Films" }],
       },
       {
         name: "Eddie Brock / Venom",
         role: "Topher Grace",
         bio: "Ehrgeiziger Fotograf-Rivale Peters, der sich mit dem außerirdischen Symbionten verbindet, nachdem Peter ihn hat auffliegen lassen, und als Venom Rache sucht.",
+        powers: ["Symbiotenkräfte", "Formwandlung", "Übermenschliche Kraft"],
         films: [{ title: "Spider-Man 3", year: 2007, note: "Tritt in der zweiten Filmhälfte auf, Antagonist im Finale" }],
       },
       {
         name: "Flint Marko / Sandman",
         role: "Thomas Haden Church",
         bio: "Ein flüchtiger Krimineller, der nach einem Unfall in einem Partikelbeschleuniger die Fähigkeit erhält, seinen Körper in Sand zu verwandeln — und sich als der wahre Mörder von Peters Onkel Ben entpuppt.",
+        powers: ["Sand-Körperumwandlung", "Formveränderung", "Regeneration"],
         films: [{ title: "Spider-Man 3", year: 2007, note: "Nebenhandlung von Beginn an, zentral im Finale" }],
       },
       {
         name: "Tante May",
         role: "Rosemary Harris",
         bio: "Peters liebevolle Tante, die ihn nach dem Tod seiner Eltern großzieht und ihm nach dem Verlust ihres Mannes Ben moralischen Halt gibt.",
+        powers: ["Keine Superkräfte", "Moralischer Rückhalt"],
         films: [
           { title: "Spider-Man", year: 2002, note: "Durchgehende Nebenrolle" },
           { title: "Spider-Man 2", year: 2004, note: "Durchgehende Nebenrolle" },
@@ -214,6 +223,7 @@ const UNIVERSES = [
         name: "Peter Parker / Spider-Man",
         role: "Andrew Garfield",
         bio: "Ein wissenschaftlich begabter, introvertierter Teenager, der nach dem Verschwinden seiner Eltern bei Onkel Ben und Tante May aufwächst und nach einem Biss in Oscorps Laboren zu Spider-Man wird.",
+        powers: ["Übermenschliche Kraft", "Wandkletterfähigkeit", "Spinnensinn", "Mechanische Netzschützen"],
         films: [
           { title: "The Amazing Spider-Man", year: 2012, note: "Hauptrolle" },
           { title: "The Amazing Spider-Man 2", year: 2014, note: "Hauptrolle" },
@@ -224,6 +234,7 @@ const UNIVERSES = [
         name: "Gwen Stacy",
         role: "Emma Stone",
         bio: "Peters hochintelligente Mitschülerin und große Liebe, Tochter des Polizeichefs, die ihm bei seinen wissenschaftlichen Ermittlungen hilft — bis ihr tragischer Tod die Geschichte für immer prägt.",
+        powers: ["Keine Superkräfte", "Wissenschaftliches Genie"],
         films: [
           { title: "The Amazing Spider-Man", year: 2012, note: "Hauptrolle" },
           { title: "The Amazing Spider-Man 2", year: 2014, note: "Hauptrolle bis zum tragischen Finale" },
@@ -233,36 +244,42 @@ const UNIVERSES = [
         name: "Harry Osborn",
         role: "Dane DeHaan",
         bio: "Peters Jugendfreund und Erbe von Oscorp, der an einer tödlichen Erbkrankheit leidet und sich nach seiner Verwandlung in den Green Goblin gegen Spider-Man wendet.",
+        powers: ["Goblin-Serum-Stärke", "Regeneration"],
         films: [{ title: "The Amazing Spider-Man 2", year: 2014, note: "Zentrale Rolle, ab der Filmmitte als Green Goblin" }],
       },
       {
         name: "Curt Connors / The Lizard",
         role: "Rhys Ifans",
         bio: "Ein Wissenschaftler mit nur einem Arm, der an Regenerationsforschung arbeitet und sich nach einem Selbstversuch in die reptilienhafte Bestie The Lizard verwandelt.",
+        powers: ["Reptilien-Regeneration", "Übermenschliche Kraft", "Schwanz als Waffe"],
         films: [{ title: "The Amazing Spider-Man", year: 2012, note: "Hauptantagonist des Films" }],
       },
       {
         name: "Max Dillon / Electro",
         role: "Jamie Foxx",
         bio: "Ein übersehener Oscorp-Elektroingenieur, der nach einem Unfall mit Elektroaalen zu einem Wesen aus reiner Energie wird und in seiner Verzweiflung nach Anerkennung zum Bösewicht wird.",
+        powers: ["Elektrizitätskontrolle", "Energieform"],
         films: [{ title: "The Amazing Spider-Man 2", year: 2014, note: "Hauptantagonist, ab der ersten Filmhälfte" }],
       },
       {
         name: "Aleksei Sytsevich / Rhino",
         role: "Paul Giamatti",
         bio: "Ein russischer Krimineller, der in einem schweren, gepanzerten Kampfanzug als Rhino auftritt.",
+        powers: ["Gepanzerter Kampfanzug", "Übermenschliche Kraft"],
         films: [{ title: "The Amazing Spider-Man 2", year: 2014, note: "Kurzer Auftritt zu Beginn und im Schlussteaser" }],
       },
       {
         name: "Captain George Stacy",
         role: "Denis Leary",
         bio: "Der New Yorker Polizeichef und Gwens Vater, der Spider-Man zunächst misstrauisch gegenübersteht, ihm aber im Sterben aufträgt, seine Tochter aus seinem gefährlichen Leben herauszuhalten.",
+        powers: ["Keine Superkräfte", "Polizeiausbildung"],
         films: [{ title: "The Amazing Spider-Man", year: 2012, note: "Durchgehende Nebenrolle, stirbt im Finale" }],
       },
       {
         name: "Tante May",
         role: "Sally Field",
         bio: "Peters Tante, die nach dem Tod ihres Mannes Ben allein für Peter sorgt und zunehmend ahnt, dass er ein Doppelleben führt.",
+        powers: ["Keine Superkräfte"],
         films: [
           { title: "The Amazing Spider-Man", year: 2012, note: "Durchgehende Nebenrolle" },
           { title: "The Amazing Spider-Man 2", year: 2014, note: "Durchgehende Nebenrolle" },
@@ -293,6 +310,7 @@ const UNIVERSES = [
         name: "Peter Parker / Spider-Man",
         role: "Tom Holland",
         bio: "Ein technikbegeisterter Highschool-Schüler aus Queens, der von Tony Stark entdeckt und gefördert wird und zwischen Schulalltag und Superheldenleben balanciert, bevor seine Identität öffentlich wird.",
+        powers: ["Übermenschliche Kraft", "Wandkletterfähigkeit", "Spinnensinn", "High-Tech-Anzug"],
         films: [
           { title: "Captain America: Civil War", year: 2016, note: "Kurzer, entscheidender Auftritt im Flughafen-Showdown" },
           { title: "Spider-Man: Homecoming", year: 2017, note: "Hauptrolle" },
@@ -306,6 +324,7 @@ const UNIVERSES = [
         name: "MJ (Michelle Jones)",
         role: "Zendaya",
         bio: "Peters schlagfertige, unabhängige Mitschülerin, die im Laufe der Filme seine engste Vertraute und Freundin wird.",
+        powers: ["Keine Superkräfte", "Scharfsinn"],
         films: [
           { title: "Spider-Man: Homecoming", year: 2017, note: "Kleine Nebenrolle" },
           { title: "Spider-Man: Far From Home", year: 2019, note: "Wachsende Nähe zu Peter" },
@@ -316,6 +335,7 @@ const UNIVERSES = [
         name: "Ned Leeds",
         role: "Jacob Batalon",
         bio: "Peters bester Freund, der als Erster sein Geheimnis entdeckt und ihm fortan als treuer Kumpel bei technischen Problemen zur Seite steht.",
+        powers: ["Keine Superkräfte", "Technik-Support"],
         films: [
           { title: "Spider-Man: Homecoming", year: 2017, note: "Durchgehende Nebenrolle" },
           { title: "Spider-Man: Far From Home", year: 2019, note: "Durchgehende Nebenrolle" },
@@ -326,6 +346,7 @@ const UNIVERSES = [
         name: "Tony Stark / Iron Man",
         role: "Robert Downey Jr.",
         bio: "Genialer Erfinder und Milliardär, der Peter als Mentor unter seine Fittiche nimmt, ihm den Iron-Spider-Anzug baut und ihm väterliche Verantwortung beibringt.",
+        powers: ["Genie-Intellekt", "Powered-Rüstung", "Repulsor-Strahlen", "Flug"],
         films: [
           { title: "Captain America: Civil War", year: 2016, note: "Rekrutiert Peter" },
           { title: "Spider-Man: Homecoming", year: 2017, note: "Mentor-Rolle in mehreren Szenen" },
@@ -337,6 +358,7 @@ const UNIVERSES = [
         name: "Happy Hogan",
         role: "Jon Favreau",
         bio: "Tonys treuer Leibwächter und Fahrer, der nach Tonys Tod eine Art Ersatz-Vaterfigur für Peter und Vertrauter von Tante May wird.",
+        powers: ["Keine Superkräfte", "Bodyguard-Training"],
         films: [
           { title: "Spider-Man: Homecoming", year: 2017, note: "Durchgehende Nebenrolle" },
           { title: "Spider-Man: Far From Home", year: 2019, note: "Durchgehende Nebenrolle" },
@@ -346,6 +368,7 @@ const UNIVERSES = [
         name: "Tante May",
         role: "Marisa Tomei",
         bio: "Peters Tante, die ihn großzieht, gegen Ende von Far From Home sein Geheimnis erfährt und ihn danach tatkräftig unterstützt.",
+        powers: ["Keine Superkräfte"],
         films: [
           { title: "Captain America: Civil War", year: 2016, note: "Kurzer Auftritt" },
           { title: "Spider-Man: Homecoming", year: 2017, note: "Durchgehende Nebenrolle" },
@@ -357,18 +380,21 @@ const UNIVERSES = [
         name: "Quentin Beck / Mysterio",
         role: "Jake Gyllenhaal",
         bio: "Ein ehemaliger Stark-Industries-Mitarbeiter, der sich als Held aus einem Paralleluniversum ausgibt, um Peters Vertrauen zu gewinnen und ihn zu manipulieren.",
+        powers: ["Illusionstechnologie", "Drohnen-Projektionen"],
         films: [{ title: "Spider-Man: Far From Home", year: 2019, note: "Hauptantagonist, entlarvt sich in der zweiten Hälfte" }],
       },
       {
         name: "Adrian Toomes / Vulture",
         role: "Michael Keaton",
         bio: "Ein Bauunternehmer, dessen Firma von Stark-Aufräumarbeiten verdrängt wird und der daraufhin mit gestohlener Alien-Technologie als Vulture kriminell wird.",
+        powers: ["Fluganzug mit Alien-Technologie", "Krallen"],
         films: [{ title: "Spider-Man: Homecoming", year: 2017, note: "Hauptantagonist des gesamten Films" }],
       },
       {
         name: "Doctor Strange",
         role: "Benedict Cumberbatch",
         bio: "Meister der Mystic Arts, der Peter in No Way Home mit einem Multiversum-Zauber helfen will, der dann außer Kontrolle gerät.",
+        powers: ["Magie der Mystic Arts", "Astralprojektion", "Zeitmanipulation"],
         films: [
           { title: "Spider-Man: Far From Home", year: 2019, note: "Kurze Erwähnung (sein Anzug wird ausgeliehen)" },
           { title: "Spider-Man: No Way Home", year: 2021, note: "Zentrale Rolle über den gesamten Film" },
@@ -402,6 +428,7 @@ const UNIVERSES = [
         name: "Steve Rogers / Captain America",
         role: "Chris Evans",
         bio: "Ein während des Zweiten Weltkriegs von einem Supersoldaten-Serum verwandelter Rekrut, der acht Jahrzehnte tiefgefroren im Eis überlebt und zum moralischen Anführer der Avengers wird.",
+        powers: ["Supersoldaten-Serum", "Übermenschliche Kraft & Ausdauer", "Vibranium-Schild", "Taktisches Genie"],
         films: [
           { title: "Captain America: The First Avenger", year: 2011, note: "Hauptrolle" },
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
@@ -416,6 +443,7 @@ const UNIVERSES = [
         name: "Natasha Romanoff / Black Widow",
         role: "Scarlett Johansson",
         bio: "Eine ehemalige russische Spionin und Attentäterin, die als Elite-Agentin von S.H.I.E.L.D. zu einem Gründungsmitglied der Avengers wird.",
+        powers: ["Meisterkämpferin", "Spionage-Training", "Keine Superkräfte"],
         films: [
           { title: "Iron Man 2", year: 2010, note: "Erster Auftritt, Nebenrolle" },
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
@@ -431,6 +459,7 @@ const UNIVERSES = [
         name: "Thor Odinson",
         role: "Chris Hemsworth",
         bio: "Der Kronprinz von Asgard und Gott des Donners, dessen Hochmut ihn zunächst auf die Erde verbannt, bevor er lernt, ein würdiger Anführer und Avenger zu werden.",
+        powers: ["Gottheit", "Mjölnir/Stormbreaker & Blitzkontrolle", "Übermenschliche Stärke", "Flug"],
         films: [
           { title: "Thor", year: 2011, note: "Hauptrolle" },
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
@@ -446,6 +475,7 @@ const UNIVERSES = [
         name: "Bruce Banner / Hulk",
         role: "Mark Ruffalo",
         bio: "Ein brillanter Physiker, der sich nach einem Gammastrahlen-Unfall unter Stress in den unkontrollierbar starken Hulk verwandelt und lange darum kämpft, seine beiden Seiten zu vereinen.",
+        powers: ["Unbegrenzte Wutkraft", "Selbstheilung", "Genie-Intellekt (als Banner)"],
         films: [
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
           { title: "Avengers: Age of Ultron", year: 2015, note: "Hauptrolle" },
@@ -458,6 +488,7 @@ const UNIVERSES = [
         name: "Clint Barton / Hawkeye",
         role: "Jeremy Renner",
         bio: "Ein Meisterschütze ohne Superkräfte, der als S.H.I.E.L.D.-Agent zum Avenger wird und nach dem Verlust seiner Familie im Blip zum rachsüchtigen \"Ronin\" wird.",
+        powers: ["Meisterschütze", "Keine Superkräfte", "Nahkampf-Training"],
         films: [
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
           { title: "Avengers: Age of Ultron", year: 2015, note: "Hauptrolle" },
@@ -469,6 +500,7 @@ const UNIVERSES = [
         name: "Wanda Maximoff / Scarlet Witch",
         role: "Elizabeth Olsen",
         bio: "Eine durch Experimente mit dem Zepter-Stein zur mächtigen Realitäts-Manipulatorin gewordene Sokovianerin, deren Trauer über den Verlust ihres Partners Vision sie schließlich zur Bedrohung für das Multiversum macht.",
+        powers: ["Chaosmagie", "Telekinese", "Realitätsmanipulation"],
         films: [
           { title: "Avengers: Age of Ultron", year: 2015, note: "Erster Auftritt, Hauptrolle" },
           { title: "Captain America: Civil War", year: 2016, note: "Hauptrolle" },
@@ -481,6 +513,7 @@ const UNIVERSES = [
         name: "Vision",
         role: "Paul Bettany",
         bio: "Eine aus J.A.R.V.I.S., dem Zepter-Stein und Ultrons Körper geschaffene künstliche Lebensform, die zum loyalen Avenger und Wandas große Liebe wird.",
+        powers: ["Künstliche Lebensform", "Infinity-Stein-Stirnjuwel", "Phasing", "Energiestrahlen"],
         films: [
           { title: "Avengers: Age of Ultron", year: 2015, note: "Entsteht im Finale, Hauptrolle" },
           { title: "Captain America: Civil War", year: 2016, note: "Nebenrolle" },
@@ -491,6 +524,7 @@ const UNIVERSES = [
         name: "Nick Fury",
         role: "Samuel L. Jackson",
         bio: "Der Direktor von S.H.I.E.L.D. und später der Organisation S.W.O.R.D., der im Hintergrund die Fäden zieht und die Avengers-Initiative ins Leben ruft.",
+        powers: ["Keine Superkräfte", "Strategisches Genie", "Geheimdienst-Erfahrung"],
         films: [
           { title: "Iron Man", year: 2008, note: "Cameo im Abspann" },
           { title: "The Avengers", year: 2012, note: "Hauptrolle" },
@@ -504,6 +538,7 @@ const UNIVERSES = [
         name: "Loki",
         role: "Tom Hiddleston",
         bio: "Thors adoptierter Bruder und Gott des Unfugs, dessen Rivalität mit seinem Bruder und Vater ihn wiederholt zwischen Bösewicht und widerwilligem Helden hin- und herwandeln lässt.",
+        powers: ["Gottheit", "Illusionsmagie", "Formwandlung", "Zauberei"],
         films: [
           { title: "Thor", year: 2011, note: "Hauptantagonist" },
           { title: "The Avengers", year: 2012, note: "Hauptantagonist" },
@@ -516,6 +551,7 @@ const UNIVERSES = [
         name: "James Rhodes / War Machine",
         role: "Don Cheadle",
         bio: "Tonys bester Freund und Air-Force-Pilot, der in einer eigenen gepanzerten Rüstung an seiner Seite kämpft.",
+        powers: ["Schwer bewaffnete Powered-Rüstung", "Flug"],
         films: [
           { title: "Iron Man 2", year: 2010, note: "Hauptrolle" },
           { title: "Iron Man 3", year: 2013, note: "Nebenrolle" },
@@ -529,6 +565,7 @@ const UNIVERSES = [
         name: "Scott Lang / Ant-Man",
         role: "Paul Rudd",
         bio: "Ein reformierter Einbrecher, der mit einem schrumpfenden Anzug zum Superhelden wird und eine Schlüsselrolle bei der Rückkehr aus dem Blip spielt.",
+        powers: ["Pym-Partikel-Größenveränderung", "Ameisen-Kontrolle"],
         films: [
           { title: "Ant-Man", year: 2015, note: "Hauptrolle" },
           { title: "Captain America: Civil War", year: 2016, note: "Nebenrolle" },
@@ -541,6 +578,7 @@ const UNIVERSES = [
         name: "Hope van Dyne / Wasp",
         role: "Evangeline Lilly",
         bio: "Hank Pyms Tochter, die das Erbe ihrer Mutter als Wasp antritt und zur ebenbürtigen Partnerin von Ant-Man wird.",
+        powers: ["Pym-Partikel-Größenveränderung", "Handklingen-Blaster", "Flug"],
         films: [
           { title: "Ant-Man", year: 2015, note: "Nebenrolle" },
           { title: "Ant-Man and the Wasp", year: 2018, note: "Hauptrolle" },
@@ -552,6 +590,7 @@ const UNIVERSES = [
         name: "T'Challa / Black Panther",
         role: "Chadwick Boseman",
         bio: "Der König von Wakanda, der als Black Panther sein hochentwickeltes, isoliertes Land beschützt und schließlich der Welt öffnet.",
+        powers: ["Vibranium-Anzug", "Herzförmiges-Kraut-Kräfte", "Verbesserte Sinne & Krallen"],
         films: [
           { title: "Captain America: Civil War", year: 2016, note: "Erster Auftritt, Hauptrolle" },
           { title: "Black Panther", year: 2018, note: "Hauptrolle" },
@@ -563,6 +602,7 @@ const UNIVERSES = [
         name: "Carol Danvers / Captain Marvel",
         role: "Brie Larson",
         bio: "Eine ehemalige Air-Force-Pilotin, die durch einen Unfall mit einem außerirdischen Energiekern kosmische Kräfte erhält und zu einer der stärksten Avengers wird.",
+        powers: ["Photonenenergie-Absorption & -Abschuss", "Flug", "Übermenschliche Kraft"],
         films: [
           { title: "Captain Marvel", year: 2019, note: "Hauptrolle" },
           { title: "Avengers: Endgame", year: 2019, note: "Hauptrolle" },
@@ -573,6 +613,7 @@ const UNIVERSES = [
         name: "Peter Quill / Star-Lord",
         role: "Chris Pratt",
         bio: "Ein von der Erde entführter Weltraum-Abenteurer und Anführer der Guardians of the Galaxy, der sich später mit den Avengers gegen Thanos verbündet.",
+        powers: ["Element-Pistolen", "Halb-celestisches Erbe", "Jet-Stiefel"],
         films: [
           { title: "Guardians of the Galaxy", year: 2014, note: "Hauptrolle" },
           { title: "Guardians of the Galaxy Vol. 2", year: 2017, note: "Hauptrolle" },
@@ -585,6 +626,7 @@ const UNIVERSES = [
         name: "Gamora",
         role: "Zoe Saldaña",
         bio: "Thanos' adoptierte Tochter und eine der tödlichsten Kämpferinnen der Galaxis, die sich gegen ihren Ziehvater stellt und Teil der Guardians wird.",
+        powers: ["Meisterkämpferin", "Übermenschliche Kraft (kybernetisch verstärkt)"],
         films: [
           { title: "Guardians of the Galaxy", year: 2014, note: "Hauptrolle" },
           { title: "Guardians of the Galaxy Vol. 2", year: 2017, note: "Hauptrolle" },
@@ -596,6 +638,7 @@ const UNIVERSES = [
         name: "Thanos",
         role: "Josh Brolin",
         bio: "Der \"Mad Titan\", überzeugt, dass nur die Auslöschung der Hälfte allen Lebens im Universum dessen Überleben sichern kann — der mächtigste Widersacher der Infinity Saga.",
+        powers: ["Übermenschliche Titanenkraft", "Nahezu unverwundbar", "Infinity-Handschuh (zeitweise)"],
         films: [
           { title: "Guardians of the Galaxy", year: 2014, note: "Kurzer Cameo" },
           { title: "Avengers: Infinity War", year: 2018, note: "Hauptantagonist" },
@@ -633,30 +676,35 @@ const UNIVERSES = [
         name: "Reed Richards / Mister Fantastic",
         role: "Pedro Pascal",
         bio: "Brillanter Wissenschaftler und Anführer der Fantastic Four, dessen Körper nach einem kosmischen Strahlungsunfall gummiartig dehnbar wird.",
+        powers: ["Körper unendlich dehnbar/verformbar", "Genie-Intellekt"],
         films: [{ title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Sue Storm / Invisible Woman",
         role: "Vanessa Kirby",
         bio: "Reeds Partnerin, die sich und Objekte unsichtbar machen sowie Kraftfelder erzeugen kann, und als moralischer Anker des Teams gilt.",
+        powers: ["Unsichtbarkeit", "Kraftfelder"],
         films: [{ title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Johnny Storm / Human Torch",
         role: "Joseph Quinn",
         bio: "Sues impulsiver jüngerer Bruder, der seinen Körper vollständig in Flammen hüllen und fliegen kann.",
+        powers: ["Körper in Flammen hüllen", "Flug", "Feuerkontrolle"],
         films: [{ title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Ben Grimm / The Thing",
         role: "Ebon Moss-Bachrach",
         bio: "Reeds bester Freund, dessen Haut sich nach dem Unfall in gesteinsartige, überstarke Materie verwandelt hat.",
+        powers: ["Gesteinshaut", "Übermenschliche Kraft & Widerstandsfähigkeit"],
         films: [{ title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Victor von Doom / Doctor Doom",
         role: "Robert Downey Jr.",
         bio: "Herrscher von Latveria und einer der mächtigsten Menschen im Marvel-Multiversum, dessen Zusammenstoß mit den Fantastic Four ihn direkt auf Kollisionskurs mit den Avengers bringt.",
+        powers: ["Magie & Technologie-Fusion", "Panzerrüstung", "Genie-Intellekt"],
         films: [
           { title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptantagonist" },
           { title: "Avengers: Doomsday", year: 2026, note: "Zentraler Antagonist der Multiversum-Konvergenz" },
@@ -666,6 +714,7 @@ const UNIVERSES = [
         name: "Silver Surfer",
         role: "Julia Garner",
         bio: "Der silberne Herold eines kosmischen Weltenfressers, der der Erde als Vorbote einer bevorstehenden Zerstörung erscheint.",
+        powers: ["Kosmische Energie-Manipulation", "Board-gestützter Flug mit Lichtgeschwindigkeit"],
         films: [{ title: "The Fantastic Four: First Steps", year: 2025, note: "Taucht in der ersten Filmhälfte als Bedrohung auf" }],
       },
     ],
@@ -694,6 +743,7 @@ const UNIVERSES = [
         name: "Yelena Belova",
         role: "Florence Pugh",
         bio: "Eine in Russland ausgebildete Attentäterin und \"Schwester\" von Natasha Romanoff, die nach deren Tod als zynische, aber loyale Söldnerin auftritt und schließlich die Thunderbolts anführt.",
+        powers: ["Meisterkämpferin", "Black-Widow-Training", "Keine Superkräfte"],
         films: [
           { title: "Black Widow", year: 2021, note: "Hauptrolle" },
           { title: "Thunderbolts*", year: 2025, note: "Hauptrolle" },
@@ -703,12 +753,14 @@ const UNIVERSES = [
         name: "Bucky Barnes / Winter Soldier",
         role: "Sebastian Stan",
         bio: "Steve Rogers' Jugendfreund, der jahrzehntelang als gehirngewaschener Sowjet-Attentäter missbraucht wurde und inzwischen als US-Kongressabgeordneter versucht, seine Vergangenheit wiedergutzumachen.",
+        powers: ["Bionischer Vibranium-Arm", "Übermenschliche Kraft (Serum-Rest)"],
         films: [{ title: "Thunderbolts*", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Alexei Shostakov / Red Guardian",
         role: "David Harbour",
         bio: "Die sowjetische Antwort auf Captain America — ein tollpatschiger, aber gutherziger Ex-Superheld und Yelenas Ziehvater.",
+        powers: ["Sowjetisches Super-Soldaten-Serum", "Übermenschliche Kraft"],
         films: [
           { title: "Black Widow", year: 2021, note: "Nebenrolle" },
           { title: "Thunderbolts*", year: 2025, note: "Nebenrolle" },
@@ -718,6 +770,7 @@ const UNIVERSES = [
         name: "Ava Starr / Ghost",
         role: "Hannah John-Kamen",
         bio: "Eine Frau, deren Molekularinstabilität ihr erlaubt, durch Wände zu phasen, was ihr aber quälende Schmerzen bereitet.",
+        powers: ["Phasing durch feste Materie", "Unsichtbarkeit"],
         films: [
           { title: "Ant-Man and the Wasp", year: 2018, note: "Hauptantagonistin" },
           { title: "Thunderbolts*", year: 2025, note: "Teammitglied" },
@@ -727,12 +780,14 @@ const UNIVERSES = [
         name: "John Walker / U.S. Agent",
         role: "Wyatt Russell",
         bio: "Der offizielle, vom Staat ernannte Nachfolger als Captain America, der nach seinem Fall von Gnaden zum knallharten Söldner wird.",
+        powers: ["Super-Soldaten-Serum", "Vibranium-Schild"],
         films: [{ title: "Thunderbolts*", year: 2025, note: "Hauptrolle" }],
       },
       {
         name: "Antonia Dreykov / Taskmaster",
         role: "Olga Kurylenko",
         bio: "Eine durch Konditionierung zur perfekten Kampfmaschine gemachte Attentäterin, die jede beobachtete Kampftechnik exakt kopieren kann.",
+        powers: ["Fotografisches Reflex-Gedächtnis", "Kopiert jede gesehene Kampftechnik"],
         films: [
           { title: "Black Widow", year: 2021, note: "Hauptantagonistin" },
           { title: "Thunderbolts*", year: 2025, note: "Teammitglied" },
@@ -742,6 +797,7 @@ const UNIVERSES = [
         name: "Valentina Allegra de Fontaine",
         role: "Julia Louis-Dreyfus",
         bio: "Eine skrupellose Geheimdienst-Chefin, die die Thunderbolts als ihre eigene Privatarmee für schmutzige Missionen zusammenstellt.",
+        powers: ["Keine Superkräfte", "Politisches Kalkül"],
         films: [
           { title: "Black Widow", year: 2021, note: "Post-Credit-Auftritt" },
           { title: "Thunderbolts*", year: 2025, note: "Hauptrolle" },
@@ -751,6 +807,7 @@ const UNIVERSES = [
         name: "Bob Reynolds / Sentry & The Void",
         role: "Lewis Pullman",
         bio: "Ein Mann mit der Kraft einer Million explodierender Sonnen, dessen Superkräfte von einer finsteren, selbstzerstörerischen Alter-Ego-Persönlichkeit namens The Void begleitet werden.",
+        powers: ["Kraft einer Million Sonnen", "Flug", "The Void als dunkles Alter Ego"],
         films: [{ title: "Thunderbolts*", year: 2025, note: "Zentrale Rolle, ab der Filmmitte als Sentry/Void enthüllt" }],
       },
     ],
@@ -777,6 +834,7 @@ const UNIVERSES = [
         name: "Charles Xavier / Professor X",
         role: "Patrick Stewart",
         bio: "Der mächtigste Telepath der Welt und Gründer der Xavier-Schule, der von einer friedlichen Koexistenz zwischen Mutanten und Menschen träumt.",
+        powers: ["Telepathie", "Cerebro-Verstärkung", "Gedankenkontrolle"],
         films: [
           { title: "X-Men", year: 2000, note: "Hauptrolle" },
           { title: "X2", year: 2003, note: "Hauptrolle" },
@@ -788,6 +846,7 @@ const UNIVERSES = [
         name: "Erik Lehnsherr / Magneto",
         role: "Ian McKellen",
         bio: "Ein Holocaust-Überlebender mit der Fähigkeit, Metall zu kontrollieren, der radikal für das Überleben der Mutanten kämpft — oft im Widerspruch zu seinem alten Freund Xavier.",
+        powers: ["Magnetismus-Kontrolle", "Metallmanipulation", "Flug (durch Magnetfelder)"],
         films: [
           { title: "X-Men", year: 2000, note: "Hauptantagonist" },
           { title: "X2", year: 2003, note: "Zentrale Rolle" },
@@ -799,6 +858,7 @@ const UNIVERSES = [
         name: "Logan / Wolverine",
         role: "Hugh Jackman",
         bio: "Ein nahezu unsterblicher Mutant mit Selbstheilungskraft, ausfahrbaren Adamantium-Krallen und einem geheimnisvollen Gedächtnisverlust über seine Vergangenheit.",
+        powers: ["Selbstheilung", "Adamantium-Krallen", "Verbesserte Sinne"],
         films: [
           { title: "X-Men", year: 2000, note: "Hauptrolle" },
           { title: "X2", year: 2003, note: "Hauptrolle" },
@@ -813,6 +873,7 @@ const UNIVERSES = [
         name: "Raven / Mystique",
         role: "Rebecca Romijn",
         bio: "Eine Gestaltwandlerin, die jede Person perfekt imitieren kann und lange Zeit loyal an Magnetos Seite kämpft.",
+        powers: ["Formwandlung", "Perfekte Imitation"],
         films: [
           { title: "X-Men", year: 2000, note: "Nebenrolle" },
           { title: "X2", year: 2003, note: "Nebenrolle" },
@@ -823,6 +884,7 @@ const UNIVERSES = [
         name: "Ororo Munroe / Storm",
         role: "Halle Berry",
         bio: "Eine Mutantin, die das Wetter beherrscht und zu einer der wichtigsten Lehrerinnen an Xaviers Schule wird.",
+        powers: ["Wetterkontrolle", "Flug"],
         films: [
           { title: "X-Men", year: 2000, note: "Nebenrolle" },
           { title: "X2", year: 2003, note: "Nebenrolle" },
@@ -834,6 +896,7 @@ const UNIVERSES = [
         name: "Scott Summers / Cyclops",
         role: "James Marsden",
         bio: "Xaviers ältester Schüler, der ohne seine spezielle Rubin-Quarz-Visierbrille unkontrollierbare Energiestrahlen aus den Augen schießt.",
+        powers: ["Optische Energiestrahlen"],
         films: [
           { title: "X-Men", year: 2000, note: "Nebenrolle" },
           { title: "X2", year: 2003, note: "Nebenrolle" },
@@ -844,6 +907,7 @@ const UNIVERSES = [
         name: "Jean Grey / Phoenix",
         role: "Famke Janssen",
         bio: "Eine der mächtigsten Telepathinnen und Telekinetikerinnen überhaupt, deren unterdrückte \"Phoenix-Kraft\" sie in The Last Stand in eine zerstörerische Entität verwandelt.",
+        powers: ["Telepathie", "Telekinese", "Phoenix-Kraft (kosmisch)"],
         films: [
           { title: "X-Men", year: 2000, note: "Nebenrolle" },
           { title: "X2", year: 2003, note: "opfert sich am Ende des Films" },
@@ -854,6 +918,7 @@ const UNIVERSES = [
         name: "Hank McCoy / Beast",
         role: "Nicholas Hoult",
         bio: "Ein brillanter Wissenschaftler und Mutant mit blauem Fell und tierischer Kraft und Beweglichkeit, der zwischen seiner menschlichen und mutierten Seite hin- und hergerissen ist.",
+        powers: ["Übermenschliche Kraft & Beweglichkeit", "Erhöhter Intellekt", "Krallen & Reißzähne"],
         films: [
           { title: "X-Men: First Class", year: 2011, note: "Hauptrolle" },
           { title: "X-Men: Days of Future Past", year: 2014, note: "Nebenrolle" },
@@ -865,6 +930,7 @@ const UNIVERSES = [
         name: "Wade Wilson / Deadpool",
         role: "Ryan Reynolds",
         bio: "Ein Söldner mit loser Zunge, der nach einem Selbstheilungsexperiment zum vierte-Wand-brechenden Antihelden Deadpool wird.",
+        powers: ["Regeneration/Selbstheilung", "Nahkampf-Expertise", "Vierte-Wand-Bewusstsein"],
         films: [
           { title: "X-Men Origins: Wolverine", year: 2009, note: "Kleine Nebenrolle" },
           { title: "Deadpool", year: 2016, note: "Hauptrolle" },
@@ -902,12 +968,17 @@ const UNIVERSES = [
     yOffset: 2.6,
     isDoomsday: true,
     releaseDate: "2026-12-18T00:00:00",
+    // Sobald ein offizieller Trailer verfügbar ist, hier die YouTube-Video-ID eintragen
+    // (z.B. "dQw4w9WgXcQ" aus https://www.youtube.com/watch?v=dQw4w9WgXcQ) — dann
+    // erscheint automatisch ein eingebetteter Trailer im Panel.
+    trailerYouTubeId: null,
     desc: "Doctor Doom bricht in das Kernuniversum ein — und reißt die Grenzen zwischen den Welten der Avengers, X-Men und Fantastic Four endgültig ein. Der bislang größte Marvel-Crossover.",
     characters: [
       {
         name: "Victor von Doom / Doctor Doom",
         role: "Robert Downey Jr.",
         bio: "Herrscher von Latveria und einer der mächtigsten Menschen im Marvel-Multiversum. Nach seinem Aufeinandertreffen mit den Fantastic Four wird er zur zentralen Bedrohung für alle Universen gleichzeitig.",
+        powers: ["Magie & Technologie-Fusion", "Panzerrüstung", "Genie-Intellekt"],
         films: [
           { title: "The Fantastic Four: First Steps", year: 2025, note: "Erster Auftritt als Antagonist" },
           { title: "Avengers: Doomsday", year: 2026, note: "Hauptantagonist" },
@@ -917,6 +988,7 @@ const UNIVERSES = [
         name: "Sam Wilson / Captain America",
         role: "Anthony Mackie",
         bio: "Ehemaliger Air-Force-Pararescue-Soldat und Falcon, der von Steve Rogers den Schild übernommen hat und nun als neuer Captain America die Erde gegen die größte Bedrohung ihrer Geschichte verteidigt.",
+        powers: ["Vibranium-Flügelanzug", "Vibranium-Schild", "Kampftraining"],
         films: [
           { title: "Captain America: Brave New World", year: 2025, note: "Hauptrolle" },
           { title: "Avengers: Doomsday", year: 2026, note: "Hauptrolle, führt die Allianz an" },
@@ -926,24 +998,28 @@ const UNIVERSES = [
         name: "Charles Xavier / Professor X",
         role: "Patrick Stewart",
         bio: "Der mächtigste Telepath der Welt, der aus seinem eigenen Universum in die Doomsday-Konvergenz gezogen wird, um gemeinsam mit den Avengers gegen Doctor Doom zu bestehen.",
+        powers: ["Telepathie", "Cerebro-Verstärkung", "Gedankenkontrolle"],
         films: [{ title: "Avengers: Doomsday", year: 2026, note: "Teil der Multiversum-Allianz" }],
       },
       {
         name: "Erik Lehnsherr / Magneto",
         role: "Ian McKellen",
         bio: "Der mächtige Metall-Manipulator aus dem X-Men-Universum, der trotz seiner Vergangenheit mit den Avengers gegen die gemeinsame Bedrohung antritt.",
+        powers: ["Magnetismus-Kontrolle", "Metallmanipulation"],
         films: [{ title: "Avengers: Doomsday", year: 2026, note: "Teil der Multiversum-Allianz" }],
       },
       {
         name: "Ororo Munroe / Storm",
         role: "Halle Berry",
         bio: "Die wettersteuernde X-Men-Anführerin, die ihre Kräfte in der finalen Schlacht gegen Doctor Doom in die Waagschale wirft.",
+        powers: ["Wetterkontrolle", "Flug"],
         films: [{ title: "Avengers: Doomsday", year: 2026, note: "Teil der Multiversum-Allianz" }],
       },
       {
         name: "Reed Richards / Mister Fantastic",
         role: "Pedro Pascal",
         bio: "Der geniale Anführer der Fantastic Four, dessen wissenschaftliches Verständnis der Multiversum-Mechanik zum Schlüssel im Kampf gegen Doom werden könnte.",
+        powers: ["Körper unendlich dehnbar/verformbar", "Genie-Intellekt"],
         films: [
           { title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" },
           { title: "Avengers: Doomsday", year: 2026, note: "Zentrale Rolle" },
@@ -953,6 +1029,7 @@ const UNIVERSES = [
         name: "Sue Storm / Invisible Woman",
         role: "Vanessa Kirby",
         bio: "Reeds Partnerin und moralischer Anker der Fantastic Four, die ihre Kraftfelder nun im größten Crossover der Filmreihe einsetzt.",
+        powers: ["Unsichtbarkeit", "Kraftfelder"],
         films: [
           { title: "The Fantastic Four: First Steps", year: 2025, note: "Hauptrolle" },
           { title: "Avengers: Doomsday", year: 2026, note: "Zentrale Rolle" },
@@ -962,6 +1039,7 @@ const UNIVERSES = [
         name: "Bucky Barnes / Winter Soldier",
         role: "Sebastian Stan",
         bio: "Der ehemalige Winter Soldier und Thunderbolts-Kämpfer, der an der Seite von Sam Wilson erneut in die vorderste Front zieht.",
+        powers: ["Bionischer Vibranium-Arm", "Übermenschliche Kraft (Serum-Rest)"],
         films: [
           { title: "Thunderbolts*", year: 2025, note: "Hauptrolle" },
           { title: "Avengers: Doomsday", year: 2026, note: "Teil der Allianz" },
@@ -971,6 +1049,7 @@ const UNIVERSES = [
         name: "Yelena Belova",
         role: "Florence Pugh",
         bio: "Die scharfzüngige Anführerin der Thunderbolts, die mit ihrem Team der neuen, größten Bedrohung des Multiversums entgegentritt.",
+        powers: ["Meisterkämpferin", "Black-Widow-Training"],
         films: [
           { title: "Thunderbolts*", year: 2025, note: "Hauptrolle" },
           { title: "Avengers: Doomsday", year: 2026, note: "Teil der Allianz" },
@@ -998,6 +1077,7 @@ const UNIVERSES = [
         name: "Thanos",
         role: "Josh Brolin",
         bio: "Der \"Mad Titan\" von Titan, überzeugt, dass nur die Auslöschung der Hälfte allen Lebens im Universum dessen Überleben sichern kann — der mächtigste Widersacher der Infinity Saga.",
+        powers: ["Übermenschliche Titanenkraft", "Nahezu unverwundbar", "Infinity-Handschuh (zeitweise)"],
         films: [
           { title: "Guardians of the Galaxy", year: 2014, note: "Kurzer Cameo" },
           { title: "Avengers: Infinity War", year: 2018, note: "Hauptantagonist, Schlacht auf Titan im Mittelteil" },
@@ -1008,6 +1088,7 @@ const UNIVERSES = [
         name: "Nebula",
         role: "Karen Gillan",
         bio: "Thanos' von ihm selbst kybernetisch \"verbesserte\" Adoptivtochter und Gamoras Schwester, die sich nach jahrelanger Rivalität endgültig gegen ihren Vater wendet.",
+        powers: ["Kybernetische Körperverbesserungen", "Meisterkämpferin"],
         films: [
           { title: "Guardians of the Galaxy", year: 2014, note: "Nebenrolle" },
           { title: "Guardians of the Galaxy Vol. 2", year: 2017, note: "Nebenrolle" },
