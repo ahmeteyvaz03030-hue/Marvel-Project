@@ -456,6 +456,94 @@ html, body {
   color: var(--text-dim);
 }
 
+/* ---------- Search (Charaktere & Filme) ---------- */
+#search-wrap {
+  position: fixed;
+  top: 24px;
+  left: 26px;
+  z-index: 7;
+  width: min(320px, calc(100vw - 200px));
+}
+
+#search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 11, 20, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 10px 16px;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+#search-box:focus-within {
+  border-color: var(--accent);
+  background: rgba(10, 11, 20, 0.85);
+}
+
+#search-icon { font-size: 13px; opacity: 0.8; }
+
+#search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+}
+
+#search-input::placeholder { color: var(--text-dim); }
+
+#search-results {
+  margin-top: 8px;
+  background: rgba(10, 11, 20, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+#search-results.hidden { display: none; }
+
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-left: 3px solid var(--accent-color, var(--accent));
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s ease;
+}
+
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: rgba(255,255,255,0.06); }
+
+.search-tag { font-size: 13px; flex-shrink: 0; }
+
+.search-text { display: flex; flex-direction: column; min-width: 0; }
+
+.search-label {
+  font-size: 13.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-sub { font-size: 11px; color: var(--text-dim); }
+
+.search-empty {
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* ---------- Profile badge ---------- */
 #profile-badge {
   position: fixed;

@@ -91,6 +91,86 @@
   }
   initTravel();
 
+  // ---------- Suche (Charaktere & Filme) ----------
+  function buildSearchIndex() {
+    const index = [];
+    UNIVERSES.forEach((u) => {
+      u.characters.forEach((c) => {
+        index.push({
+          type: "character",
+          label: c.name,
+          sub: `${c.role} · ${u.name}`,
+          universe: u,
+          character: c,
+        });
+      });
+      u.movies.forEach((m) => {
+        index.push({
+          type: "movie",
+          label: m.title,
+          sub: `${m.year} · ${u.name}`,
+          universe: u,
+        });
+      });
+    });
+    return index;
+  }
+
+  function initSearch() {
+    const searchIndex = buildSearchIndex();
+    const wrap = document.getElementById("search-wrap");
+    const input = document.getElementById("search-input");
+    const results = document.getElementById("search-results");
+
+    function renderResults(matches) {
+      results.innerHTML = "";
+      if (matches.length === 0) {
+        results.innerHTML = `<div class="search-empty">Keine Treffer</div>`;
+        results.classList.remove("hidden");
+        return;
+      }
+      matches.slice(0, 8).forEach((m) => {
+        const item = document.createElement("div");
+        item.className = "search-item";
+        item.style.setProperty("--accent-color", m.universe.accent);
+        item.innerHTML = `
+          <span class="search-tag">${m.type === "character" ? "★" : "🎬"}</span>
+          <div class="search-text">
+            <span class="search-label">${m.label}</span>
+            <span class="search-sub">${m.sub}</span>
+          </div>`;
+        item.addEventListener("click", () => {
+          selectUniverse(m.universe.id);
+          if (m.type === "character") {
+            setTimeout(() => openCharacterModal(m.character, m.universe.accent), 300);
+          }
+          input.value = "";
+          results.classList.add("hidden");
+        });
+        results.appendChild(item);
+      });
+      results.classList.remove("hidden");
+    }
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        results.classList.add("hidden");
+        return;
+      }
+      renderResults(searchIndex.filter((m) => m.label.toLowerCase().includes(q)));
+    });
+
+    input.addEventListener("focus", () => {
+      if (input.value.trim()) results.classList.remove("hidden");
+    });
+
+    document.addEventListener("pointerdown", (e) => {
+      if (!wrap.contains(e.target)) results.classList.add("hidden");
+    });
+  }
+  initSearch();
+
   // ---------- Renderer / Scene / Camera ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -297,69 +377,96 @@
   });
 
   // ---------- Doctor Doom (stilisierte Wächter-Figur) ----------
+  // Kein echtes Schauspielerfoto (Urheber-/Persönlichkeitsrechte) — stattdessen eine
+  // bewusst erwachsen und bedrohlich wirkende, hochaufgelöste Metall-Silhouette.
   function createDoomFigure() {
     const group = new THREE.Group();
 
-    // Schulter-/Umhang-Silhouette (breit, unten)
-    const capeMat = new THREE.MeshStandardMaterial({
-      color: 0x0a2e16,
-      roughness: 0.75,
-      metalness: 0.25,
+    // Bodenlanger Umhang — breite Basis, schmale Schultern für eine hochgewachsene Silhouette
+    const cloakMat = new THREE.MeshStandardMaterial({
+      color: 0x0d3320,
+      roughness: 0.82,
+      metalness: 0.18,
       flatShading: true,
       side: THREE.DoubleSide,
     });
-    const cape = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.2, 8, 1, true), capeMat);
-    cape.rotation.x = Math.PI;
-    cape.position.y = -1.1;
-    group.add(cape);
+    const cloak = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 2.5, 5.6, 10, 1, true), cloakMat);
+    cloak.position.y = -1.7;
+    group.add(cloak);
 
-    // Kapuze hinter dem Kopf (kurz, nicht spitz — wirkt wie ein Umhang-Kragen)
-    const hoodMat = new THREE.MeshStandardMaterial({
-      color: 0x0f4a26,
-      roughness: 0.6,
-      metalness: 0.35,
-      flatShading: true,
-    });
-    const hood = new THREE.Mesh(new THREE.SphereGeometry(1.7, 7, 6, 0, Math.PI * 2, 0, Math.PI * 0.62), hoodMat);
-    hood.position.set(0, 0.55, -0.35);
-    hood.rotation.x = Math.PI * 0.06;
-    group.add(hood);
-
-    // Metallmaske — das dominante Gesicht der Figur
-    const maskMat = new THREE.MeshStandardMaterial({
-      color: 0x8a6a2a,
-      roughness: 0.22,
-      metalness: 0.92,
-      flatShading: true,
-      emissive: 0x3a2a0c,
-      emissiveIntensity: 0.3,
-    });
-    const mask = new THREE.Mesh(new THREE.SphereGeometry(1.35, 7, 6), maskMat);
-    mask.scale.set(1, 1.12, 0.82);
-    mask.position.set(0, 0.35, 0.95);
-    group.add(mask);
-
-    // Stirn-/Kinnkante für mehr Maskencharakter
-    const browMat = new THREE.MeshStandardMaterial({
-      color: 0x6b4f1c,
-      roughness: 0.3,
+    // Schulterpanzer — sorgt für eine breite, erwachsene Statur statt rundlicher Proportionen
+    const armorMat = new THREE.MeshStandardMaterial({
+      color: 0x2b2e33,
+      roughness: 0.32,
       metalness: 0.9,
       flatShading: true,
     });
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.32, 0.5), browMat);
-    brow.position.set(0, 0.92, 1.55);
+    const shoulderGeo = new THREE.BoxGeometry(1.15, 0.5, 0.9);
+    const shoulderL = new THREE.Mesh(shoulderGeo, armorMat);
+    shoulderL.position.set(-1.2, 0.75, 0.1);
+    shoulderL.rotation.z = 0.18;
+    const shoulderR = shoulderL.clone();
+    shoulderR.position.x = 1.2;
+    shoulderR.rotation.z = -0.18;
+    group.add(shoulderL, shoulderR);
+
+    // Metallkragen am Hals
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.15, 8, 20), armorMat);
+    collar.position.y = 0.62;
+    collar.rotation.x = Math.PI / 2;
+    group.add(collar);
+
+    // Metallmaske — glatt schattiert für einen polierten, realistischeren Metalleindruck
+    const maskMat = new THREE.MeshStandardMaterial({
+      color: 0x6d7178,
+      roughness: 0.2,
+      metalness: 1,
+      flatShading: false,
+      emissive: 0x14150f,
+      emissiveIntensity: 0.25,
+    });
+    const mask = new THREE.Mesh(new THREE.IcosahedronGeometry(1.05, 2), maskMat);
+    mask.scale.set(0.94, 1.18, 0.92);
+    mask.position.set(0, 1.55, 0.5);
+    group.add(mask);
+
+    // Kantige Stirn-/Augenbrauenpartie für einen strengeren, weniger rundlichen Ausdruck
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.26, 0.55), armorMat);
+    brow.position.set(0, 1.98, 1.2);
     group.add(brow);
 
+    // Kinnpartie
+    const chin = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.55, 5), maskMat);
+    chin.rotation.x = Math.PI;
+    chin.position.set(0, 0.68, 0.75);
+    group.add(chin);
+
+    // Kapuze über der Maske, mit spitzem Abschluss
+    const hoodMat = new THREE.MeshStandardMaterial({
+      color: 0x0d3320,
+      roughness: 0.78,
+      metalness: 0.2,
+      flatShading: true,
+      side: THREE.DoubleSide,
+    });
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(1.4, 9, 8, 0, Math.PI * 2, 0, Math.PI * 0.56), hoodMat);
+    hood.position.set(0, 2.05, -0.3);
+    group.add(hood);
+    const hoodPoint = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.85, 6), hoodMat);
+    hoodPoint.position.set(0, 3.05, -0.55);
+    group.add(hoodPoint);
+
+    // Schmale, glühende Augenschlitze
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x39ff6a });
-    const eyeGeo = new THREE.BoxGeometry(0.42, 0.18, 0.14);
+    const eyeGeo = new THREE.BoxGeometry(0.32, 0.09, 0.12);
     const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.5, 0.42, 1.78);
+    eyeL.position.set(-0.34, 1.62, 1.35);
     const eyeR = eyeL.clone();
-    eyeR.position.x = 0.5;
+    eyeR.position.x = 0.34;
     group.add(eyeL, eyeR);
 
     const eyeLight = new THREE.PointLight(0x39ff6a, 2.6, 16, 2);
-    eyeLight.position.set(0, 0.42, 2.1);
+    eyeLight.position.set(0, 1.6, 1.7);
     group.add(eyeLight);
 
     const clickTargets = [];
@@ -370,8 +477,8 @@
       }
     });
 
-    group.scale.setScalar(2.2);
-    group.position.set(-25, 13, -8);
+    group.scale.setScalar(1.7);
+    group.position.set(-26, 12, -8);
     group.rotation.y = 0.45;
 
     return { group, eyeLight, clickTargets };
@@ -609,7 +716,7 @@
     starfield.rotation.y += dt * 0.004;
 
     doomFigure.group.rotation.y = 0.45 + Math.sin(t * 0.15) * 0.3;
-    doomFigure.group.position.y = 13 + Math.sin(t * 0.4) * 0.5;
+    doomFigure.group.position.y = 12 + Math.sin(t * 0.4) * 0.5;
     doomFigure.eyeLight.intensity = 2.6 + Math.sin(t * 3) * 0.9;
 
     updateLabels();
