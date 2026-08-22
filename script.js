@@ -113,6 +113,49 @@
       osc.stop(ctx.currentTime + 1.25);
     }
 
+    // Dramatischer Signature-Sound für das Doomsday-Universum: tiefer, dröhnender
+    // Akkord plus ein metallischer Einschlag (gefilterter Noise-Burst).
+    function playDoom() {
+      if (muted || !ensureCtx()) return;
+      const now = ctx.currentTime;
+
+      [55, 58.27, 41.2].forEach((f) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(f, now);
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 420;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(0.26, now + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+        osc.connect(filter);
+        filter.connect(g);
+        g.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + 2.3);
+      });
+
+      const bufferSize = Math.floor(ctx.sampleRate * 0.4);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = "highpass";
+      noiseFilter.frequency.value = 1200;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.12;
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      noise.start(now);
+    }
+
     function setMuted(v) {
       muted = v;
       try {
@@ -123,7 +166,7 @@
       if (masterGain) masterGain.gain.value = v ? 0 : 0.35;
     }
 
-    return { ensureCtx, startAmbient, playClick, playWhoosh, playCollect, playPower, setMuted, isMuted: () => muted };
+    return { ensureCtx, startAmbient, playClick, playWhoosh, playCollect, playPower, playDoom, setMuted, isMuted: () => muted };
   }
   const Sound = initSound();
 
@@ -967,7 +1010,11 @@
     if (!p) return;
     activeId = id;
     hint.style.display = "none";
-    Sound.playWhoosh();
+    if (id === "doomsday") {
+      Sound.playDoom();
+    } else {
+      Sound.playWhoosh();
+    }
     recordVisit(id);
 
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));

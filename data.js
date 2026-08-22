@@ -968,10 +968,7 @@ const UNIVERSES = [
     yOffset: 2.6,
     isDoomsday: true,
     releaseDate: "2026-12-18T00:00:00",
-    // Sobald ein offizieller Trailer verfügbar ist, hier die YouTube-Video-ID eintragen
-    // (z.B. "dQw4w9WgXcQ" aus https://www.youtube.com/watch?v=dQw4w9WgXcQ) — dann
-    // erscheint automatisch ein eingebetteter Trailer im Panel.
-    trailerYouTubeId: null,
+    trailerYouTubeId: "V66hDfAckI8",
     desc: "Doctor Doom bricht in das Kernuniversum ein — und reißt die Grenzen zwischen den Welten der Avengers, X-Men und Fantastic Four endgültig ein. Der bislang größte Marvel-Crossover.",
     characters: [
       {
