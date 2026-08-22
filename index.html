@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -37,6 +37,14 @@
   <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
 
   <div id="toast-layer"></div>
+
+  <div id="trailer-widget" class="hidden">
+    <div id="trailer-widget-head">
+      <span id="trailer-widget-title">🎬 Trailer</span>
+      <button id="trailer-widget-close" aria-label="Schließen">✕</button>
+    </div>
+    <div id="trailer-widget-frame"></div>
+  </div>
 
   <div id="snap-overlay" class="hidden">
     <div id="snap-content">
@@ -130,7 +138,7 @@
 
       <div id="trailer-block" class="hidden">
         <div class="countdown-label">TRAILER</div>
-        <div id="trailer-frame-wrap"></div>
+        <button id="trailer-reopen-btn">🎬 Trailer im Mini-Player abspielen</button>
       </div>
 
       <section class="panel-section">
@@ -167,7 +175,7 @@
   </div>
 
   <script src="vendor/three.min.js"></script>
-  <script src="data.js?v=9"></script>
-  <script src="script.js?v=9"></script>
+  <script src="data.js?v=10"></script>
+  <script src="script.js?v=10"></script>
 </body>
 </html>

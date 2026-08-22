@@ -983,9 +983,30 @@
     panel.classList.remove("open");
     camPosTarget.copy(DEFAULT_CAM_POS);
     lookTarget.set(0, 0, 0);
-    // Trailer-Wiedergabe stoppen, indem das iframe entfernt wird
-    document.getElementById("trailer-frame-wrap").innerHTML = "";
+    // Der Trailer läuft bewusst im Mini-Player weiter (nicht hier stoppen).
   }
+
+  // ---------- Persistenter Trailer-Mini-Player (läuft im Hintergrund weiter) ----------
+  function openTrailerWidget(u) {
+    const widget = document.getElementById("trailer-widget");
+    const frame = document.getElementById("trailer-widget-frame");
+    const title = document.getElementById("trailer-widget-title");
+    if (widget.dataset.currentId === u.trailerYouTubeId) {
+      widget.classList.remove("hidden");
+      return;
+    }
+    widget.dataset.currentId = u.trailerYouTubeId;
+    title.textContent = `🎬 ${u.name} — Trailer`;
+    frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${u.trailerYouTubeId}?autoplay=1" title="${u.name} Trailer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    widget.classList.remove("hidden");
+  }
+
+  document.getElementById("trailer-widget-close").addEventListener("click", () => {
+    const widget = document.getElementById("trailer-widget");
+    widget.classList.add("hidden");
+    widget.dataset.currentId = "";
+    document.getElementById("trailer-widget-frame").innerHTML = "";
+  });
 
   document.getElementById("panel-close").addEventListener("click", deselect);
   window.addEventListener("keydown", (e) => {
@@ -1122,14 +1143,12 @@
     }
 
     const trailerBlock = document.getElementById("trailer-block");
-    const trailerWrap = document.getElementById("trailer-frame-wrap");
     if (u.trailerYouTubeId) {
-      // autoplay=1 startet den echten Original-Ton des Trailers automatisch,
-      // da das Öffnen des Panels stets durch eine echte Nutzer-Klick-Aktion ausgelöst wird.
-      trailerWrap.innerHTML = `<iframe src="https://www.youtube.com/embed/${u.trailerYouTubeId}?autoplay=1" title="${u.name} Trailer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      // Öffnet/startet den persistenten Mini-Player (läuft auch beim Planetenwechsel weiter).
+      openTrailerWidget(u);
       trailerBlock.classList.remove("hidden");
+      document.getElementById("trailer-reopen-btn").onclick = () => openTrailerWidget(u);
     } else {
-      trailerWrap.innerHTML = "";
       trailerBlock.classList.add("hidden");
     }
 
