@@ -580,9 +580,28 @@
       .toUpperCase();
   }
 
+  // Stilisierte "Figur" statt echtem Foto: Büsten-Silhouette mit Initialen,
+  // eingefärbt in der Akzentfarbe des jeweiligen Universums.
+  function characterFigureSVG(accent, initials) {
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="g" cx="50%" cy="32%" r="75%">
+          <stop offset="0%" stop-color="${accent}" stop-opacity="1"/>
+          <stop offset="100%" stop-color="${accent}" stop-opacity="0.35"/>
+        </radialGradient>
+      </defs>
+      <rect width="100" height="100" fill="#0d0e16"/>
+      <circle cx="50" cy="50" r="50" fill="url(#g)"/>
+      <path d="M14 96 Q14 60 50 58 Q86 60 86 96 Z" fill="#0b0c14" opacity="0.68"/>
+      <circle cx="50" cy="40" r="19" fill="#0b0c14" opacity="0.68"/>
+      <text x="50" y="46" text-anchor="middle" font-family="Orbitron, sans-serif" font-size="19" font-weight="700" fill="#fff">${initials}</text>
+    </svg>`;
+  }
+
   function openCharacterModal(c, accent) {
     const modal = document.getElementById("character-modal");
-    document.getElementById("character-avatar").innerHTML = `<span style="--accent-color:${accent}">${getInitials(c.name)}</span>`;
+    document.getElementById("character-card").style.setProperty("--accent-color", accent);
+    document.getElementById("character-avatar").innerHTML = characterFigureSVG(accent, getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
     document.getElementById("character-bio").textContent =
@@ -628,9 +647,8 @@
     charList.innerHTML = "";
     u.characters.forEach((c) => {
       const li = document.createElement("li");
-      const initials = getInitials(c.name);
       li.innerHTML = `
-        <div class="avatar" style="--accent-color:${u.accent}">${initials}</div>
+        <div class="avatar">${characterFigureSVG(u.accent, getInitials(c.name))}</div>
         <div class="info">
           <span class="cname">${c.name}</span>
           <span class="crole">${c.role}</span>
