@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marvel Multiverse — 3D Universen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+
+  <div id="vignette"></div>
+
+  <header id="hud">
+    <h1 class="title">MARVEL <span>MULTIVERSE</span></h1>
+    <p class="subtitle">Wähle ein Universum, um es zu erkunden</p>
+  </header>
+
+  <div id="labels-layer"></div>
+
+  <div id="hint">Klicke einen Planeten, um sein Universum zu betreten</div>
+
+  <aside id="panel">
+    <button id="panel-close" aria-label="Schließen">✕</button>
+    <div id="panel-inner">
+      <div class="panel-eyebrow" id="panel-eyebrow">UNIVERSUM</div>
+      <h2 id="panel-title">—</h2>
+      <p id="panel-desc"></p>
+
+      <div id="countdown-block" class="hidden">
+        <div class="countdown-label">KINOSTART — COUNTDOWN</div>
+        <div id="countdown" class="countdown">
+          <div class="cd-unit"><span id="cd-days">00</span><small>Tage</small></div>
+          <div class="cd-unit"><span id="cd-hours">00</span><small>Std</small></div>
+          <div class="cd-unit"><span id="cd-min">00</span><small>Min</small></div>
+          <div class="cd-unit"><span id="cd-sec">00</span><small>Sek</small></div>
+        </div>
+        <div id="countdown-date"></div>
+      </div>
+
+      <section class="panel-section">
+        <h3>Charaktere</h3>
+        <ul id="panel-characters" class="character-list"></ul>
+      </section>
+
+      <section class="panel-section">
+        <h3>Filme</h3>
+        <ol id="panel-movies" class="movie-list"></ol>
+      </section>
+    </div>
+  </aside>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
