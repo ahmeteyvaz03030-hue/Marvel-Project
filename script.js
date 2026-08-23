@@ -516,6 +516,19 @@
   let camTarget = new THREE.Vector3(0, 0, 0);
   let camPosTarget = DEFAULT_CAM_POS.clone();
   let lookTarget = new THREE.Vector3(0, 0, 0);
+  let flying = false;
+
+  // ---------- Freie Kamerasteuerung: Ziehen = drehen (360°), Scrollen/Pinch = zoomen ----------
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.minDistance = 4;
+  controls.maxDistance = 150;
+  controls.rotateSpeed = 0.55;
+  controls.zoomSpeed = 0.8;
+  controls.target.copy(lookTarget);
+  canvas.style.touchAction = "none";
 
   // ---------- Lights ----------
   scene.add(new THREE.AmbientLight(0x404060, 1.1));
@@ -938,10 +951,22 @@
   });
 
   // ---------- Raycast click on planets ----------
+  // Klick wird erst bei pointerup mit geringer Bewegung ausgelöst, damit ein
+  // Dreh-Drag (OrbitControls) über einem Planeten nicht versehentlich als Klick zählt.
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  let pointerDownAt = null;
 
   canvas.addEventListener("pointerdown", (e) => {
+    pointerDownAt = { x: e.clientX, y: e.clientY };
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    if (!pointerDownAt) return;
+    const moved = Math.hypot(e.clientX - pointerDownAt.x, e.clientY - pointerDownAt.y);
+    pointerDownAt = null;
+    if (moved > 6) return;
+
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
@@ -969,16 +994,20 @@
     hint.style.display = "none";
     Sound.playWhoosh();
     recordVisit(id);
+    flying = true;
 
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));
     labelEls[id].classList.add("active");
 
     fillPanel(p.data);
     panel.classList.add("open");
+    document.body.classList.add("panel-open");
   }
 
   function deselect() {
     activeId = null;
+    flying = true;
+    document.body.classList.remove("panel-open");
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));
     panel.classList.remove("open");
     camPosTarget.copy(DEFAULT_CAM_POS);
@@ -1206,11 +1235,21 @@
         el.style.display = "none";
         return;
       }
-      const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+      const rawX = (projected.x * 0.5 + 0.5) * window.innerWidth;
+      const rawY = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+      const x = rawX;
+      const y = Math.min(Math.max(rawY, 100), window.innerHeight - 150);
       el.style.display = "flex";
       el.style.left = x + "px";
       el.style.top = (y - 30) + "px";
+
+      // Label nach dem Positionieren am tatsächlichen Rand einfangen, egal wie
+      // breit sein Text ist (variiert je nach Sprache/Universumsname).
+      const rect = el.getBoundingClientRect();
+      let dx = 0;
+      if (rect.left < 6) dx = 6 - rect.left;
+      else if (rect.right > window.innerWidth - 6) dx = window.innerWidth - 6 - rect.right;
+      if (dx !== 0) el.style.left = x + dx + "px";
     });
   }
 
@@ -1220,35 +1259,45 @@
     const t = clock.elapsedTime;
 
     planetObjects.forEach((p) => {
-      if (p.orbitRadius > 0) {
-        p.angle += p.orbitSpeed * dt;
-        p.group.position.set(
-          Math.cos(p.angle) * p.orbitRadius,
-          p.yOffset + Math.sin(t * 0.3 + p.angle) * 0.6,
-          Math.sin(p.angle) * p.orbitRadius
-        );
-      } else {
-        p.group.position.set(0, p.yOffset + Math.sin(t * 0.4) * 0.4, 0);
+      // Der fokussierte Planet bleibt während der Ansicht an Ort und Stelle stehen,
+      // damit man frei um ihn herum drehen kann, ohne dass er wegdriftet.
+      if (p.data.id !== activeId) {
+        if (p.orbitRadius > 0) {
+          p.angle += p.orbitSpeed * dt;
+          p.group.position.set(
+            Math.cos(p.angle) * p.orbitRadius,
+            p.yOffset + Math.sin(t * 0.3 + p.angle) * 0.6,
+            Math.sin(p.angle) * p.orbitRadius
+          );
+        } else {
+          p.group.position.set(0, p.yOffset + Math.sin(t * 0.4) * 0.4, 0);
+        }
       }
       p.mesh.rotation.y += p.spinSpeed * dt;
     });
 
-    // camera follow when a planet is selected
-    if (activeId) {
-      const p = planetObjects.find((pl) => pl.data.id === activeId);
-      if (p) {
-        const wp = new THREE.Vector3();
-        p.mesh.getWorldPosition(wp);
-        const dir = wp.clone().normalize();
-        camPosTarget.copy(wp).addScaledVector(dir, p.data.radius * 3.2 + 6);
-        camPosTarget.y += p.data.radius * 1.4 + 2;
-        lookTarget.copy(wp);
+    // Beim Auswählen/Verlassen eines Universums fliegt die Kamera einmalig zur
+    // Zielposition; danach übernimmt OrbitControls die freie Steuerung (Drehen/Zoomen).
+    if (flying) {
+      if (activeId) {
+        const p = planetObjects.find((pl) => pl.data.id === activeId);
+        if (p) {
+          const wp = new THREE.Vector3();
+          p.mesh.getWorldPosition(wp);
+          const dir = wp.clone().normalize();
+          camPosTarget.copy(wp).addScaledVector(dir, p.data.radius * 3.2 + 6);
+          camPosTarget.y += p.data.radius * 1.4 + 2;
+          lookTarget.copy(wp);
+        }
+      }
+      camera.position.lerp(camPosTarget, 1 - Math.pow(0.001, dt));
+      camTarget.lerp(lookTarget, 1 - Math.pow(0.001, dt));
+      if (camera.position.distanceTo(camPosTarget) < 0.05 && camTarget.distanceTo(lookTarget) < 0.05) {
+        flying = false;
       }
     }
-
-    camera.position.lerp(camPosTarget, 1 - Math.pow(0.001, dt));
-    camTarget.lerp(lookTarget, 1 - Math.pow(0.001, dt));
-    camera.lookAt(camTarget);
+    controls.target.copy(camTarget);
+    controls.update();
 
     starfield.rotation.y += dt * 0.004;
 

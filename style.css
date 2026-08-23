@@ -1345,11 +1345,39 @@ html, body {
 
 @media (max-width: 640px) {
   #panel { width: 100%; }
-  .title { letter-spacing: 3px; }
-  #bottom-actions { bottom: 16px; right: 12px; left: 12px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* Kopfzeile: Titel unter die Eckelemente schieben statt darüber zu legen */
+  #hud { padding: 84px 12px 0; }
+  .title { font-size: 21px; letter-spacing: 2px; }
+  .subtitle { display: none; }
+
+  #search-wrap { top: 14px; left: 12px; width: 168px; }
+  #search-box { padding: 8px 12px; }
+  #search-input { font-size: 12px; }
+  #search-results { max-height: 50vh; }
+
+  #profile-badge { top: 14px; right: 12px; padding: 5px 8px 5px 5px; gap: 6px; }
+  .profile-meta { display: none; }
+
+  #stones-tracker { top: 58px; right: 12px; padding: 6px 8px; gap: 4px; }
+  .stone-dot { width: 10px; height: 10px; }
+
+  /* Hinweistext ausblenden, damit er nicht von der Button-Leiste verdeckt wird */
+  #hint { display: none; }
+
+  #bottom-actions { bottom: 14px; right: 12px; left: 12px; flex-wrap: wrap; justify-content: center; gap: 8px; }
   #bottom-actions button { padding: 9px 14px; font-size: 10.5px; }
-  #profile-badge { top: 16px; right: 16px; }
-  #stones-tracker { top: 60px; right: 16px; }
+
+  .planet-label .name { font-size: 10.5px; padding: 3px 8px; }
+
+  /* Panel-Inhalt beginnt unterhalb der Such-/Profilleiste statt darunter versteckt zu sein */
+  #panel { padding-top: 96px; }
+  #panel-close { top: 96px; right: 16px; z-index: 9; }
+
+  /* Während ein Universum offen ist, blendet die untere Button-Leiste aus,
+     damit sie nicht die letzten Panel-Inhalte (z.B. "Filme") verdeckt */
+  body.panel-open #bottom-actions { display: none; }
+
   #gate-cards { gap: 14px; }
   .gate-card { width: 140px; padding: 16px 10px; }
   #compare-pickers { flex-direction: column; }
