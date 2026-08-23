@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -18,9 +18,19 @@
   <div id="user-gate">
     <div class="gate-card-wrap">
       <div class="gate-eyebrow">MULTIVERSUM-ZUGANG</div>
-      <h2>Wähle deinen Avatar</h2>
-      <p>Wer betritt heute das Marvel-Multiversum?</p>
+      <h2 id="gate-heading">Wähle deinen Avatar</h2>
+      <p id="gate-sub">Wer betritt heute das Marvel-Multiversum?</p>
       <div id="gate-cards"></div>
+
+      <div id="gate-create-form" class="hidden">
+        <input id="gate-create-name" type="text" placeholder="Dein Name" maxlength="20" autocomplete="off">
+        <input id="gate-create-hero" type="text" placeholder="Lieblingsheld (optional)" maxlength="30" autocomplete="off">
+        <div id="gate-color-picker"></div>
+        <div class="gate-create-actions">
+          <button id="gate-create-cancel">Abbrechen</button>
+          <button id="gate-create-confirm">Erstellen</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -176,7 +186,7 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="data.js?v=15"></script>
-  <script src="script.js?v=15"></script>
+  <script src="data.js?v=17"></script>
+  <script src="script.js?v=17"></script>
 </body>
 </html>

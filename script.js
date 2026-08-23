@@ -212,27 +212,129 @@
   }
 
   // ---------- User gate (Profilauswahl) ----------
+  const GATE_COLORS = ["#ff4d4d", "#5b8bff", "#38d4e0", "#ffce54", "#8a2be2", "#2ecc71", "#ff6a3c", "#ff4d9e"];
+
+  function loadCustomUsers() {
+    try {
+      return JSON.parse(localStorage.getItem("marvelCustomUsers") || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveCustomUsers(map) {
+    try {
+      localStorage.setItem("marvelCustomUsers", JSON.stringify(map));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   function initUserGate() {
     const gate = document.getElementById("user-gate");
     const cardsWrap = document.getElementById("gate-cards");
+    const createForm = document.getElementById("gate-create-form");
+    const nameInput = document.getElementById("gate-create-name");
+    const heroInput = document.getElementById("gate-create-hero");
+    const colorPicker = document.getElementById("gate-color-picker");
 
-    Object.entries(AVATARS).forEach(([id, u]) => {
-      const card = document.createElement("button");
-      card.className = "gate-card";
-      card.style.setProperty("--hero-color", u.color);
-      card.innerHTML = `
-        <div class="gate-avatar">${u.svg}</div>
-        <div class="gate-name">${u.name}</div>
-        <div class="gate-hero">${u.hero}</div>`;
-      card.addEventListener("click", () => selectUser(id));
-      cardsWrap.appendChild(card);
+    let customUsers = loadCustomUsers();
+    let allUsers = Object.assign({}, AVATARS, customUsers);
+    let pickedColor = GATE_COLORS[0];
+
+    function avatarSvgFor(u) {
+      return u.svg || characterFigureSVG(u.color, getInitials(u.name));
+    }
+
+    function renderCards() {
+      cardsWrap.innerHTML = "";
+      Object.entries(allUsers).forEach(([id, u]) => {
+        const card = document.createElement("button");
+        card.className = "gate-card";
+        card.style.setProperty("--hero-color", u.color);
+        card.innerHTML = `
+          <div class="gate-avatar">${avatarSvgFor(u)}</div>
+          <div class="gate-name">${u.name}</div>
+          <div class="gate-hero">${u.hero}</div>`;
+        card.addEventListener("click", () => selectUser(id));
+        if (customUsers[id]) {
+          const remove = document.createElement("button");
+          remove.className = "gate-card-remove";
+          remove.type = "button";
+          remove.title = "Profil löschen";
+          remove.textContent = "✕";
+          remove.addEventListener("click", (e) => {
+            e.stopPropagation();
+            delete customUsers[id];
+            delete allUsers[id];
+            saveCustomUsers(customUsers);
+            renderCards();
+          });
+          card.appendChild(remove);
+        }
+        cardsWrap.appendChild(card);
+      });
+
+      const createCard = document.createElement("button");
+      createCard.className = "gate-card gate-card-create";
+      createCard.innerHTML = `
+        <div class="gate-avatar-plus">+</div>
+        <div class="gate-name">Neuer Benutzer</div>
+        <div class="gate-hero">Eigenes Profil erstellen</div>`;
+      createCard.addEventListener("click", openCreateForm);
+      cardsWrap.appendChild(createCard);
+    }
+
+    function openCreateForm() {
+      cardsWrap.classList.add("hidden");
+      createForm.classList.remove("hidden");
+      nameInput.value = "";
+      heroInput.value = "";
+      pickedColor = GATE_COLORS[Math.floor(Math.random() * GATE_COLORS.length)];
+      colorPicker.innerHTML = "";
+      GATE_COLORS.forEach((c) => {
+        const sw = document.createElement("button");
+        sw.type = "button";
+        sw.className = "gate-color-swatch" + (c === pickedColor ? " active" : "");
+        sw.style.background = c;
+        sw.addEventListener("click", () => {
+          pickedColor = c;
+          colorPicker.querySelectorAll(".gate-color-swatch").forEach((el) => el.classList.remove("active"));
+          sw.classList.add("active");
+        });
+        colorPicker.appendChild(sw);
+      });
+      nameInput.focus();
+    }
+
+    function closeCreateForm() {
+      createForm.classList.add("hidden");
+      cardsWrap.classList.remove("hidden");
+    }
+
+    document.getElementById("gate-create-cancel").addEventListener("click", closeCreateForm);
+
+    document.getElementById("gate-create-confirm").addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        nameInput.focus();
+        return;
+      }
+      const hero = heroInput.value.trim() || "Multiversum-Reisende:r";
+      const id = "u" + Date.now().toString(36);
+      const user = { name, hero, color: pickedColor };
+      customUsers[id] = user;
+      allUsers[id] = user;
+      saveCustomUsers(customUsers);
+      closeCreateForm();
+      renderCards();
+      selectUser(id);
     });
 
     function applyUser(id) {
-      const u = AVATARS[id];
+      const u = allUsers[id];
       if (!u) return;
       currentUser = id;
-      document.getElementById("profile-avatar").innerHTML = u.svg;
+      document.getElementById("profile-avatar").innerHTML = avatarSvgFor(u);
       document.getElementById("profile-name").textContent = u.name;
       document.getElementById("profile-hero").textContent = u.hero;
       const badge = document.getElementById("profile-badge");
@@ -249,18 +351,21 @@
       Sound.playPower();
     }
 
+    renderCards();
+
     let saved = null;
     try {
       saved = localStorage.getItem("marvelUser");
     } catch (e) {
       saved = null;
     }
-    if (saved && AVATARS[saved]) {
+    if (saved && allUsers[saved]) {
       applyUser(saved);
       gate.classList.add("hidden");
     }
 
     document.getElementById("profile-switch").addEventListener("click", () => {
+      closeCreateForm();
       gate.classList.remove("hidden");
     });
   }
@@ -272,27 +377,43 @@
     const overlay = document.getElementById("travel-overlay");
     const closeBtn = document.getElementById("travel-close");
     const container = document.getElementById("travel-timeline");
+    const PHASE_COLORS = ["#ff4d4d", "#5b8bff", "#ffce54", "#38d4e0", "#8a2be2", "#ff5a3c"];
+    const SKIP_WORDS = ["the", "of", "and", "a", "to", "in"];
 
-    MCU_TIMELINE.forEach((phase) => {
-      const phaseEl = document.createElement("div");
-      phaseEl.className = "travel-phase";
-      const heading = document.createElement("h3");
-      heading.textContent = phase.phase;
-      phaseEl.appendChild(heading);
+    function posterAbbrev(title) {
+      const words = title
+        .replace(/[:*]/g, "")
+        .split(" ")
+        .filter((w) => w && !SKIP_WORDS.includes(w.toLowerCase()));
+      return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
+    }
 
-      const list = document.createElement("div");
-      list.className = "travel-list";
+    const line = document.createElement("div");
+    line.className = "mcu-line";
+    container.appendChild(line);
+
+    let side = 0;
+    MCU_TIMELINE.forEach((phase, phaseIdx) => {
+      const marker = document.createElement("div");
+      marker.className = "mcu-phase-marker";
+      marker.textContent = phase.phase;
+      container.appendChild(marker);
+
+      const color = PHASE_COLORS[phaseIdx % PHASE_COLORS.length];
       phase.films.forEach((f) => {
         const item = document.createElement("div");
-        item.className = "travel-item" + (f.finale ? " finale" : "");
+        item.className = "mcu-item " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
+        item.style.setProperty("--item-color", color);
         item.innerHTML = `
-          <span class="travel-year">${f.year}</span>
-          <span class="travel-dot"></span>
-          <span class="travel-title">${f.title}</span>`;
-        list.appendChild(item);
+          <span class="mcu-dot"></span>
+          <div class="mcu-poster">${posterAbbrev(f.title)}</div>
+          <div class="mcu-card">
+            <span class="mcu-year">${f.year}</span>
+            <span class="mcu-title">${f.title}</span>
+          </div>`;
+        container.appendChild(item);
+        side = 1 - side;
       });
-      phaseEl.appendChild(list);
-      container.appendChild(phaseEl);
     });
 
     btn.addEventListener("click", () => {
