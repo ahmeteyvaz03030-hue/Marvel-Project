@@ -377,6 +377,8 @@
     const overlay = document.getElementById("travel-overlay");
     const closeBtn = document.getElementById("travel-close");
     const container = document.getElementById("travel-timeline");
+    const storyBtn = document.getElementById("travel-mode-story");
+    const releaseBtn = document.getElementById("travel-mode-release");
     const PHASE_COLORS = ["#ff4d4d", "#5b8bff", "#ffce54", "#38d4e0", "#8a2be2", "#ff5a3c"];
     const SKIP_WORDS = ["the", "of", "and", "a", "to", "in"];
 
@@ -388,32 +390,52 @@
       return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
     }
 
-    const line = document.createElement("div");
-    line.className = "mcu-line";
-    container.appendChild(line);
+    function render(mode) {
+      container.innerHTML = "";
+      const line = document.createElement("div");
+      line.className = "mcu-line";
+      container.appendChild(line);
 
-    let side = 0;
-    MCU_TIMELINE.forEach((phase, phaseIdx) => {
-      const marker = document.createElement("div");
-      marker.className = "mcu-phase-marker";
-      marker.textContent = phase.phase;
-      container.appendChild(marker);
+      const groups = mode === "release" ? MCU_TIMELINE : MCU_CHRONO_TIMELINE;
+      let side = 0;
+      groups.forEach((group, groupIdx) => {
+        const marker = document.createElement("div");
+        marker.className = "mcu-phase-marker";
+        marker.textContent = mode === "release" ? group.phase : `${group.era} · ${group.years}`;
+        container.appendChild(marker);
 
-      const color = PHASE_COLORS[phaseIdx % PHASE_COLORS.length];
-      phase.films.forEach((f) => {
-        const item = document.createElement("div");
-        item.className = "mcu-item " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
-        item.style.setProperty("--item-color", color);
-        item.innerHTML = `
-          <span class="mcu-dot"></span>
-          <div class="mcu-poster">${posterAbbrev(f.title)}</div>
-          <div class="mcu-card">
-            <span class="mcu-year">${f.year}</span>
-            <span class="mcu-title">${f.title}</span>
-          </div>`;
-        container.appendChild(item);
-        side = 1 - side;
+        const color = PHASE_COLORS[groupIdx % PHASE_COLORS.length];
+        group.films.forEach((f) => {
+          const item = document.createElement("div");
+          item.className = "mcu-item " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
+          item.style.setProperty("--item-color", color);
+          item.innerHTML = `
+            <span class="mcu-dot"></span>
+            <div class="mcu-poster">${posterAbbrev(f.title)}</div>
+            <div class="mcu-card">
+              <span class="mcu-year">${f.year}</span>
+              <span class="mcu-title">${f.title}</span>
+              ${f.note ? `<span class="mcu-note">${f.note}</span>` : ""}
+            </div>`;
+          container.appendChild(item);
+          side = 1 - side;
+        });
       });
+    }
+
+    render("story");
+
+    storyBtn.addEventListener("click", () => {
+      storyBtn.classList.add("active");
+      releaseBtn.classList.remove("active");
+      render("story");
+      Sound.playClick();
+    });
+    releaseBtn.addEventListener("click", () => {
+      releaseBtn.classList.add("active");
+      storyBtn.classList.remove("active");
+      render("release");
+      Sound.playClick();
     });
 
     btn.addEventListener("click", () => {
@@ -423,6 +445,87 @@
     closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
   }
   initTravel();
+
+  // ---------- Theorien-Board (Fan-Theorien zu kommenden Filmen) ----------
+  function initTheories() {
+    const STORAGE_KEY = "marvelTheories";
+    const btn = document.getElementById("theories-btn");
+    const overlay = document.getElementById("theories-overlay");
+    const closeBtn = document.getElementById("theories-close");
+    const filmSelect = document.getElementById("theory-film");
+    const textInput = document.getElementById("theory-text");
+    const submitBtn = document.getElementById("theory-submit");
+    const list = document.getElementById("theories-list");
+    const emptyMsg = document.getElementById("theories-empty");
+
+    function loadTheories() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+    function saveTheories(theories) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(theories));
+      } catch (e) {}
+    }
+
+    function render() {
+      const theories = loadTheories().sort((a, b) => b.ts - a.ts);
+      list.innerHTML = "";
+      emptyMsg.classList.toggle("hidden", theories.length > 0);
+      theories.forEach((t) => {
+        const card = document.createElement("div");
+        card.className = "theory-card";
+        const date = new Date(t.ts).toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+        card.innerHTML = `
+          <div class="theory-head">
+            <span class="theory-film-tag">${t.film}</span>
+            <span class="theory-meta">${t.author} · ${date}</span>
+          </div>
+          <p class="theory-text"></p>
+          <button class="theory-delete" title="Theorie löschen">🗑</button>`;
+        card.querySelector(".theory-text").textContent = t.text;
+        card.querySelector(".theory-delete").addEventListener("click", () => {
+          const remaining = loadTheories().filter((x) => x.id !== t.id);
+          saveTheories(remaining);
+          render();
+          Sound.playClick();
+        });
+        list.appendChild(card);
+      });
+    }
+
+    submitBtn.addEventListener("click", () => {
+      const text = textInput.value.trim();
+      if (!text) return;
+      const theories = loadTheories();
+      theories.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        film: filmSelect.value,
+        text,
+        author: document.getElementById("profile-name").textContent || "Anonym",
+        ts: Date.now(),
+      });
+      saveTheories(theories);
+      textInput.value = "";
+      render();
+      Sound.playClick();
+    });
+
+    btn.addEventListener("click", () => {
+      overlay.classList.remove("hidden");
+      render();
+      Sound.playClick();
+    });
+    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+  }
+  initTheories();
 
   // ---------- Suche (Charaktere & Filme) ----------
   function initSearch() {
@@ -1230,6 +1333,34 @@
     document.getElementById("character-avatar").innerHTML = characterFigureSVG(accent, getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
+
+    const alignColors = {
+      Held: "#3fd0ff",
+      Bösewicht: "#ff4d5e",
+      Antiheld: "#c98bff",
+      Zivilist: "#9aa3b5",
+    };
+    const alignBadge = document.getElementById("character-alignment");
+    if (c.alignment) {
+      alignBadge.textContent = c.alignment.toUpperCase();
+      alignBadge.style.setProperty("--badge-color", alignColors[c.alignment] || accent);
+      alignBadge.classList.remove("hidden");
+    } else {
+      alignBadge.classList.add("hidden");
+    }
+
+    const debutBadge = document.getElementById("character-debut");
+    const debutYear = (c.films || []).reduce(
+      (min, f) => (f.year && (min === null || f.year < min) ? f.year : min),
+      null
+    );
+    if (debutYear !== null) {
+      debutBadge.textContent = "ERSTAUFTRITT " + debutYear;
+      debutBadge.classList.remove("hidden");
+    } else {
+      debutBadge.classList.add("hidden");
+    }
+
     document.getElementById("character-bio").textContent =
       c.bio || "Zu diesem Charakter liegt noch kein ausführlicher Steckbrief vor.";
 

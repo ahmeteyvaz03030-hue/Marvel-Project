@@ -923,6 +923,37 @@ html, body {
   max-width: 560px;
 }
 
+#travel-toggle {
+  display: flex;
+  gap: 8px;
+  margin: -8px 0 26px;
+}
+
+#travel-toggle button {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+#travel-toggle button.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255,77,77,0.3), rgba(90,60,255,0.25));
+  border-color: var(--accent);
+}
+
+.mcu-card .mcu-note {
+  font-size: 10.5px;
+  color: var(--accent);
+  font-style: italic;
+}
+
 /* ---------- MCU-Zeitleiste: zentrale Linie, abwechselnd links/rechts ---------- */
 .mcu-timeline {
   position: relative;
@@ -1079,9 +1110,10 @@ html, body {
 #character-fav.active { color: #ff4d6d; }
 #character-fav:hover { transform: scale(1.1); }
 
-/* ---------- Favoriten / Vergleichen Overlays (teilen das Marvel-Travel-Layout) ---------- */
+/* ---------- Favoriten / Vergleichen / Theorien Overlays (teilen das Marvel-Travel-Layout) ---------- */
 #favorites-overlay,
-#compare-overlay {
+#compare-overlay,
+#theories-overlay {
   position: fixed;
   inset: 0;
   z-index: 25;
@@ -1095,14 +1127,16 @@ html, body {
 }
 
 #favorites-overlay.hidden,
-#compare-overlay.hidden {
+#compare-overlay.hidden,
+#theories-overlay.hidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
 
 #favorites-panel,
-#compare-panel {
+#compare-panel,
+#theories-panel {
   position: relative;
   width: min(760px, 100%);
   max-height: 86vh;
@@ -1114,7 +1148,8 @@ html, body {
 }
 
 #favorites-close,
-#compare-close {
+#compare-close,
+#theories-close {
   position: absolute;
   top: 20px;
   right: 20px;
@@ -1129,7 +1164,8 @@ html, body {
 }
 
 #favorites-panel h2,
-#compare-panel h2 {
+#compare-panel h2,
+#theories-panel h2 {
   font-family: var(--font-display);
   font-size: 26px;
   margin: 8px 0 18px;
@@ -1344,7 +1380,34 @@ html, body {
 #character-role {
   font-size: 13px;
   color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+#character-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.stat-badge {
+  font-family: "Orbitron", sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 11px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--badge-color, var(--accent-color)) 20%, transparent);
+  border: 1px solid var(--badge-color, var(--accent-color));
+  color: var(--badge-color, var(--accent-color));
+}
+
+.stat-badge.hidden { display: none; }
+
+.stat-badge-outline {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
 }
 
 #character-bio {
@@ -1507,6 +1570,119 @@ html, body {
 }
 
 .compare-powers .power-chip { font-size: 11px; padding: 4px 9px; }
+
+/* ---------- Theorien-Board ---------- */
+#theory-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+  padding: 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+#theory-film {
+  align-self: flex-start;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+#theory-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 90px;
+}
+
+#theory-text:focus, #theory-film:focus { outline: 1px solid var(--accent); }
+
+#theory-submit {
+  align-self: flex-end;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255,77,77,0.35), rgba(90,60,255,0.3));
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 20px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+#theory-submit:hover { transform: translateY(-2px); }
+
+#theories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.theory-card {
+  position: relative;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 44px 16px 16px;
+}
+
+.theory-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.theory-film-tag {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+.theory-meta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.theory-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.theory-delete {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 15px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.theory-delete:hover { opacity: 1; color: #ff4d6d; }
+
+#theories-empty.hidden { display: none; }
 
 @media (max-width: 640px) {
   #panel { width: 100%; }

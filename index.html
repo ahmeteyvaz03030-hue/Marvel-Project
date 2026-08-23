@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -86,6 +86,7 @@
     <button id="compare-btn">⚔️ <span>VERGLEICHEN</span></button>
     <button id="favorites-btn">⭐ <span>FAVORITEN</span></button>
     <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
+    <button id="theories-btn">🔮 <span>THEORIEN</span></button>
   </div>
 
   <div id="travel-overlay" class="hidden">
@@ -93,7 +94,11 @@
       <button id="travel-close" aria-label="Schließen">✕</button>
       <div class="panel-eyebrow">CHRONOLOGIE</div>
       <h2>Marvel Travel — Die MCU-Reise</h2>
-      <p class="travel-sub">Alle Filme des Marvel Cinematic Universe in chronologischer Reihenfolge — bis hin zu <strong>Avengers: Doomsday</strong>.</p>
+      <p class="travel-sub">Alle Filme des Marvel Cinematic Universe — bis hin zu <strong>Avengers: Doomsday</strong>.</p>
+      <div id="travel-toggle">
+        <button id="travel-mode-story" class="active">Handlungs-Reihenfolge</button>
+        <button id="travel-mode-release">Kinostart-Reihenfolge</button>
+      </div>
       <div id="travel-timeline"></div>
     </div>
   </div>
@@ -105,6 +110,30 @@
       <h2>Meine Favoriten</h2>
       <p class="travel-sub" id="favorites-empty">Noch keine Favoriten — klicke das Herz bei einem Charakter, um ihn hier zu sammeln.</p>
       <div id="favorites-list"></div>
+    </div>
+  </div>
+
+  <div id="theories-overlay" class="hidden">
+    <div id="theories-panel">
+      <button id="theories-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">FAN-THEORIEN</div>
+      <h2>Theorien-Board</h2>
+      <p class="travel-sub">Schreib deine Theorie zu <strong>Avengers: Doomsday</strong> oder anderen kommenden Marvel-Filmen. Hinweis: Theorien werden nur lokal in diesem Browser gespeichert und sind nicht mit anderen Geräten oder Nutzern geteilt.</p>
+
+      <div id="theory-form">
+        <select id="theory-film">
+          <option value="Avengers: Doomsday">Avengers: Doomsday</option>
+          <option value="Thunderbolts*">Thunderbolts*</option>
+          <option value="Captain America: Brave New World">Captain America: Brave New World</option>
+          <option value="The Fantastic Four: First Steps">The Fantastic Four: First Steps</option>
+          <option value="Allgemein / Sonstiges">Allgemein / Sonstiges</option>
+        </select>
+        <textarea id="theory-text" placeholder="Deine Theorie…" maxlength="600" rows="4"></textarea>
+        <button id="theory-submit">Theorie veröffentlichen</button>
+      </div>
+
+      <div id="theories-list"></div>
+      <p class="travel-sub" id="theories-empty">Noch keine Theorien — sei die/der Erste!</p>
     </div>
   </div>
 
@@ -172,6 +201,10 @@
       <div class="panel-eyebrow" id="character-eyebrow">CHARAKTER</div>
       <h2 id="character-name">—</h2>
       <div id="character-role"></div>
+      <div id="character-stats">
+        <span id="character-alignment" class="stat-badge"></span>
+        <span id="character-debut" class="stat-badge stat-badge-outline"></span>
+      </div>
       <p id="character-bio"></p>
       <section class="panel-section">
         <h3>Kräfte & Eigenschaften</h3>
@@ -186,7 +219,7 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="data.js?v=17"></script>
-  <script src="script.js?v=17"></script>
+  <script src="data.js?v=18"></script>
+  <script src="script.js?v=18"></script>
 </body>
 </html>
