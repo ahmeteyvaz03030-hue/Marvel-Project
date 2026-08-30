@@ -1269,7 +1269,7 @@ html, body {
 .compare-avatar-wrap {
   position: relative;
   width: 96px;
-  height: 136px;
+  height: 125px;
   margin: 0 auto 10px;
 }
 
@@ -1366,22 +1366,22 @@ html, body {
 
 #character-avatar-wrap {
   position: relative;
-  width: 168px;
-  height: 238px;
+  width: 170px;
+  height: 221px;
   margin: 6px auto 14px;
 }
 
 #character-avatar {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 14px 40px -10px var(--accent-color, var(--accent));
 }
 
 #character-avatar svg { width: 100%; height: 100%; display: block; }
 
-/* ---------- Kräfte-Animation: animierte Aktionsfigur statt Foto ---------- */
+/* ---------- Kräfte-Animation: Poster-Portrait mit passendem Kraft-Effekt ---------- */
 @keyframes chipIn {
   from { opacity: 0; transform: translateY(6px) scale(0.92); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1390,69 +1390,92 @@ html, body {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
-@keyframes figureFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+@keyframes boltFlicker {
+  0%, 100% { opacity: 0; }
+  4% { opacity: 1; }
+  8% { opacity: 0.15; }
+  12% { opacity: 0.9; }
+  50% { opacity: 0; }
+  54% { opacity: 0.75; }
+  58% { opacity: 0; }
 }
-@keyframes figureShadowPulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50% { opacity: 0.18; transform: scale(0.82); }
+@keyframes emberRise {
+  0% { transform: translateY(6px) scale(0.75); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-16px) scale(1.15); opacity: 0; }
 }
-@keyframes handGlowPulse {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.3); }
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(-5px); opacity: 1; }
 }
-@keyframes handGlowPulseStrong {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.6); }
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.05); }
 }
-@keyframes chestPulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+@keyframes shieldArcPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.75; }
 }
-@keyframes capeSway {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
+@keyframes webShimmer {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
 }
-@keyframes shieldPulse {
-  0%, 100% { opacity: 0.55; }
+@keyframes sparkDrift {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-6px); opacity: 1; }
+}
+@keyframes rimShimmer {
+  0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }
 }
 
-.figure-body {
-  animation: figureFloat 3.2s ease-in-out infinite;
+.poster-rim {
   transform-box: fill-box;
   transform-origin: center;
+  animation: rimShimmer 3s ease-in-out infinite;
 }
-.figure-shadow {
-  animation: figureShadowPulse 3.2s ease-in-out infinite;
+.poster-effect-lightning .bolt {
   transform-box: fill-box;
   transform-origin: center;
+  animation: boltFlicker 2.6s steps(1) infinite;
 }
-.figure-chest {
-  animation: chestPulse 2.2s ease-in-out infinite;
+.poster-effect-lightning .bolt-2 { animation-delay: 0.35s; }
+.poster-effect-fire .flame {
   transform-box: fill-box;
   transform-origin: center;
+  filter: drop-shadow(0 0 5px #ff7a2e);
+  animation: emberRise 1.9s ease-in-out infinite;
 }
-.hand-glow {
+.poster-effect-fire .flame-2 { animation-delay: 0.5s; }
+.poster-effect-fire .flame-3 { animation-delay: 0.3s; }
+.poster-effect-fire .flame-4 { animation-delay: 0.8s; }
+.poster-effect-energy .orb {
   transform-box: fill-box;
   transform-origin: center;
-  filter: drop-shadow(0 0 6px var(--accent-color, currentColor));
-  animation: handGlowPulse 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 5px var(--accent-color, currentColor));
+  animation: orbFloat 3s ease-in-out infinite;
 }
-.hand-glow-strong {
-  animation: handGlowPulseStrong 1s ease-in-out infinite;
-}
-.figure-pose-flight .figure-cape {
-  transform-box: fill-box;
-  transform-origin: center top;
-  animation: capeSway 2.6s ease-in-out infinite;
-}
-.figure-shield {
+.poster-effect-energy .orb-2 { animation-delay: 0.7s; }
+.poster-effect-energy .orb-3 { animation-delay: 1.3s; }
+.poster-effect-energy .ring {
   transform-box: fill-box;
   transform-origin: center;
-  animation: shieldPulse 2s ease-in-out infinite;
+  animation: ringPulse 3.4s ease-in-out infinite;
 }
+.poster-effect-shield .shield-arc {
+  animation: shieldArcPulse 2.4s ease-in-out infinite;
+}
+.poster-effect-shield .shield-arc-2 { animation-delay: 0.6s; }
+.poster-effect-web {
+  animation: webShimmer 3.2s ease-in-out infinite;
+}
+.poster-effect-aura .spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 4px var(--accent-color, currentColor));
+  animation: sparkDrift 2.8s ease-in-out infinite;
+}
+.poster-effect-aura .spark-2 { animation-delay: 1s; }
 
 #character-name {
   font-family: var(--font-display);

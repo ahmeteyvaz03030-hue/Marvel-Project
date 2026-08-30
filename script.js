@@ -659,7 +659,7 @@
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar-wrap">
-              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, entry.character.alignment, poseFor(entry.character), getInitials(entry.character.name))}</div>
+              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, entry.character.alignment, powerEffectFor(entry.character), getInitials(entry.character.name))}</div>
             </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
@@ -1306,18 +1306,18 @@
       .toUpperCase();
   }
 
-  // Bestimmt eine grobe "Pose" für die animierte Aktionsfigur anhand der
-  // Kräfte des Charakters (Flug/Energie-Blast/Schild/neutrale Kampfhaltung).
-  function poseFor(character) {
+  // Bestimmt, welcher Kraft-Effekt zum Charakter passt (für das Poster-Portrait).
+  function powerEffectFor(character) {
     const powers = (character.powers || []).join(" ").toLowerCase();
-    if (/flug|fliegen/.test(powers)) return "flight";
+    if (/blitz|elektro/.test(powers)) return "lightning";
+    if (/feuer|flamme/.test(powers)) return "fire";
+    if (/netz|klettern/.test(powers)) return "web";
     if (/schild/.test(powers)) return "shield";
-    if (/blitz|elektro|feuer|laser|strahl|repulsor|kosmisch/.test(powers)) return "blast";
-    return "stance";
+    if (/laser|strahl|repulsor|kosmisch|magie|zauber|mystis|energie/.test(powers)) return "energy";
+    return "aura";
   }
 
-  // Hellt (percent>0) oder dunkelt (percent<0) eine Hex-Farbe ab — für
-  // Gürtel/Stiefel/Umhang-Farbtöne, die zur Akzentfarbe des Universums passen.
+  // Hellt (percent>0) oder dunkelt (percent<0) eine Hex-Farbe ab.
   function shadeColor(hex, percent) {
     const num = parseInt(hex.replace("#", ""), 16);
     const clamp = (v) => Math.max(0, Math.min(255, v));
@@ -1327,82 +1327,83 @@
     return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
   }
 
-  function eyeColorFor(alignment) {
+  // Rand-/Konturlicht-Farbe je nach Gesinnung — Bösewichte bekommen ein
+  // unheilvolles rotes Licht, Antihelden ein violettes, alle anderen das
+  // normale Universum-Akzentlicht.
+  function rimColorFor(accent, alignment) {
     if (alignment === "Bösewicht") return "#ff3b4e";
     if (alignment === "Antiheld") return "#c98bff";
-    return "#eef2ff";
+    return accent;
   }
 
-  const COMIC_INK = "#14151d";
-
-  // Comic-Held-Figur statt echtem Schauspieler-Foto: eine flach eingefärbte,
-  // dick schwarz konturierte Vektor-Figur im klassischen Comic-Stil (Maske mit
-  // Augenlinsen, breite Schultern, Gürtel/Stiefel, Brust-Emblem, optionaler
-  // Umhang) — je nach Kräften in einer passenden Pose, animiert mit sanftem
-  // Schweben, pulsierender Handenergie und wehendem Umhang bei Flug.
-  function characterActionFigureSVG(accent, alignment, pose, initials) {
-    const secondary = shadeColor(accent, -35);
-    const eye = eyeColorFor(alignment);
-    const ink = COMIC_INK;
-    const inkAttrs = `stroke="${ink}" stroke-width="3" stroke-linejoin="round"`;
-
-    let cape = "";
-    let arms;
-    let extra = "";
-
-    if (pose === "flight") {
-      cape = `<path class="figure-cape" d="M32 56 Q4 104 20 158 Q60 130 60 92 Q60 130 100 158 Q116 104 88 56 Z" fill="${secondary}" ${inkAttrs}/>`;
-      arms = `
-        <path d="M32 60 L14 76 L20 90 L36 100 L40 82 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M88 60 L106 76 L100 90 L84 100 L80 82 Z" fill="${accent}" ${inkAttrs}/>
-        <circle class="hand-glow" cx="17" cy="88" r="7" fill="${accent}"/>
-        <circle class="hand-glow" cx="103" cy="88" r="7" fill="${accent}"/>`;
-    } else if (pose === "blast") {
-      arms = `
-        <path d="M32 60 L16 34 L26 20 L42 40 L40 62 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M88 60 L104 34 L94 20 L78 40 L80 62 Z" fill="${accent}" ${inkAttrs}/>
-        <circle class="hand-glow hand-glow-strong" cx="19" cy="24" r="9" fill="${accent}"/>
-        <circle class="hand-glow hand-glow-strong" cx="101" cy="24" r="9" fill="${accent}"/>`;
-    } else if (pose === "shield") {
-      arms = `
-        <path d="M32 60 L16 74 L20 92 L36 98 L40 80 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M88 60 L74 66 L58 62 L58 78 L82 82 L88 82 Z" fill="${accent}" ${inkAttrs}/>`;
-      extra = `<circle class="figure-shield" cx="22" cy="82" r="17" fill="${secondary}" stroke="${ink}" stroke-width="3"/>
-        <path d="M22 69 L22 95 M9 82 L35 82" stroke="${accent}" stroke-width="3"/>`;
-    } else {
-      arms = `
-        <path d="M32 60 L18 78 L24 96 L38 98 L42 80 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M88 60 L102 78 L96 96 L82 98 L78 80 Z" fill="${accent}" ${inkAttrs}/>
-        <circle cx="24" cy="96" r="6" fill="${secondary}" stroke="${ink}" stroke-width="2.5"/>
-        <circle cx="96" cy="96" r="6" fill="${secondary}" stroke="${ink}" stroke-width="2.5"/>`;
+  function powerEffectSVG(accent, effect) {
+    if (effect === "lightning") {
+      return `<g class="poster-effect poster-effect-lightning">
+        <path class="bolt bolt-1" d="M22 8 L30 32 L20 34 L32 64" stroke="#cfe8ff" stroke-width="2.2" fill="none" stroke-linejoin="round"/>
+        <path class="bolt bolt-2" d="M80 4 L72 28 L82 30 L70 58" stroke="#cfe8ff" stroke-width="1.8" fill="none" stroke-linejoin="round" opacity="0.85"/>
+      </g>`;
     }
+    if (effect === "fire") {
+      return `<g class="poster-effect poster-effect-fire">
+        <circle class="flame flame-1" cx="13" cy="90" r="4" fill="#ff8a3c"/>
+        <circle class="flame flame-2" cx="19" cy="70" r="2.6" fill="#ffcf6b"/>
+        <circle class="flame flame-3" cx="87" cy="88" r="3.6" fill="#ff6a2e"/>
+        <circle class="flame flame-4" cx="81" cy="66" r="2.3" fill="#ffcf6b"/>
+      </g>`;
+    }
+    if (effect === "web") {
+      return `<g class="poster-effect poster-effect-web" stroke="${accent}" stroke-width="0.8" opacity="0.4">
+        <path d="M100 0 L58 42 M100 0 L82 58 M100 0 L100 46 M100 22 L70 50" fill="none"/>
+      </g>`;
+    }
+    if (effect === "shield") {
+      return `<g class="poster-effect poster-effect-shield" fill="none">
+        <path class="shield-arc shield-arc-1" d="M10 54 A44 44 0 0 1 28 16" stroke="${accent}" stroke-width="2.2"/>
+        <path class="shield-arc shield-arc-2" d="M90 54 A44 44 0 0 0 72 16" stroke="${accent}" stroke-width="2.2"/>
+      </g>`;
+    }
+    if (effect === "energy") {
+      return `<g class="poster-effect poster-effect-energy">
+        <circle class="orb orb-1" cx="16" cy="28" r="2.6" fill="${accent}"/>
+        <circle class="orb orb-2" cx="86" cy="22" r="2.1" fill="${accent}"/>
+        <circle class="orb orb-3" cx="10" cy="66" r="1.8" fill="${accent}"/>
+        <circle class="ring" cx="50" cy="42" r="36" fill="none" stroke="${accent}" stroke-width="1"/>
+      </g>`;
+    }
+    return `<g class="poster-effect poster-effect-aura">
+      <circle class="spark spark-1" cx="14" cy="24" r="1.5" fill="${accent}"/>
+      <circle class="spark spark-2" cx="88" cy="30" r="1.3" fill="${accent}"/>
+    </g>`;
+  }
 
-    return `<svg viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" class="figure-pose-${pose}">
+  // Stilisiertes Poster-Portrait statt echtem Schauspieler-Foto: eine
+  // schattierte Büsten-Silhouette mit dramatischem Streiflicht (wie ein
+  // Filmposter) und einem zur Kraft passenden Leucht-Effekt (Blitze, Feuer,
+  // Energie-Orbs, Schild-Bögen, Netz-Linien oder sanfte Aura) im Hintergrund.
+  function characterActionFigureSVG(accent, alignment, effect, initials) {
+    const rim = rimColorFor(accent, alignment);
+    const silhouette = shadeColor(accent, -46);
+
+    return `<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg" class="poster-pose-${effect}">
       <defs>
-        <radialGradient id="fg" cx="50%" cy="26%" r="78%">
-          <stop offset="0%" stop-color="${accent}" stop-opacity="0.4"/>
-          <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+        <radialGradient id="key" cx="32%" cy="14%" r="80%">
+          <stop offset="0%" stop-color="${rim}" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="${rim}" stop-opacity="0"/>
         </radialGradient>
+        <linearGradient id="head-shade" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${shadeColor(silhouette, 18)}"/>
+          <stop offset="100%" stop-color="${silhouette}"/>
+        </linearGradient>
       </defs>
-      <rect width="120" height="170" fill="#0a0b12"/>
-      <circle cx="60" cy="60" r="76" fill="url(#fg)"/>
-      <ellipse class="figure-shadow" cx="60" cy="160" rx="28" ry="6" fill="#000"/>
-      <g class="figure-body">
-        ${cape}
-        <path d="M44 108 L34 154 L50 154 L56 112 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M76 108 L86 154 L70 154 L64 112 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M30 150 L52 150 L52 162 L26 162 Z" fill="${secondary}" ${inkAttrs}/>
-        <path d="M68 150 L90 150 L94 162 L68 162 Z" fill="${secondary}" ${inkAttrs}/>
-        <path d="M26 58 Q60 42 94 58 L88 106 Q60 118 32 106 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M44 60 L60 100 L76 60 Q60 70 44 60 Z" fill="${secondary}" opacity="0.9"/>
-        <rect x="32" y="103" width="56" height="11" rx="4" fill="${secondary}" ${inkAttrs}/>
-        <path class="figure-chest" d="M60 68 L70 78 L60 88 L50 78 Z" fill="${ink}" stroke="${accent}" stroke-width="2.5"/>
-        <text x="60" y="81.5" text-anchor="middle" font-family="Orbitron, sans-serif" font-size="8.5" font-weight="700" fill="${accent}">${initials}</text>
-        ${arms}
-        ${extra}
-        <path d="M42 34 Q42 12 60 12 Q78 12 78 34 Q78 52 60 54 Q42 52 42 34 Z" fill="${accent}" ${inkAttrs}/>
-        <path d="M47 30 Q53 24 59 29 Q53 33 47 30 Z" fill="${eye}"/>
-        <path d="M73 30 Q67 24 61 29 Q67 33 73 30 Z" fill="${eye}"/>
+      <rect width="100" height="130" fill="#090a11"/>
+      <rect width="100" height="130" fill="url(#key)"/>
+      ${powerEffectSVG(accent, effect)}
+      <path d="M8 130 Q6 96 22 84 Q34 78 50 78 Q66 78 78 84 Q94 96 92 130 Z" fill="${silhouette}"/>
+      <path d="M34 40 Q34 18 50 16 Q66 18 66 40 Q66 56 58 62 Q50 66 42 62 Q34 56 34 40 Z" fill="url(#head-shade)"/>
+      <path class="poster-rim" d="M66 40 Q66 56 58 62 M78 84 Q94 96 92 130" stroke="${rim}" stroke-width="2" fill="none" opacity="0.85"/>
+      <g class="poster-badge">
+        <rect x="6" y="106" width="30" height="18" rx="4" fill="rgba(6,7,14,0.72)" stroke="${accent}" stroke-width="1.5"/>
+        <text x="21" y="118.5" text-anchor="middle" font-family="Orbitron, sans-serif" font-size="9" font-weight="700" fill="${accent}">${initials}</text>
       </g>
     </svg>`;
   }
@@ -1464,7 +1465,7 @@
     const accent = universe.accent;
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
-    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, c.alignment, poseFor(c), getInitials(c.name));
+    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, c.alignment, powerEffectFor(c), getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
 
