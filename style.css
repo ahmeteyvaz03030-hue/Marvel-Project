@@ -1266,10 +1266,16 @@ html, body {
   padding: 20px 16px;
 }
 
-.compare-avatar {
+.compare-avatar-wrap {
+  position: relative;
   width: 84px;
   height: 84px;
   margin: 0 auto 10px;
+}
+
+.compare-avatar {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   overflow: hidden;
   box-shadow: 0 0 0 3px rgba(255,255,255,0.1), 0 0 24px -4px var(--accent-color, var(--accent));
@@ -1358,17 +1364,71 @@ html, body {
   font-size: 14px;
 }
 
-#character-avatar {
+#character-avatar-wrap {
   position: relative;
   width: 132px;
   height: 132px;
   margin: 6px auto 14px;
+}
+
+#character-avatar {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   overflow: hidden;
   box-shadow: 0 0 0 4px rgba(255,255,255,0.1), 0 10px 40px -6px var(--accent-color, var(--accent));
 }
 
 #character-avatar svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- Kräfte-Animation: Energie-Aura um die Charakterfigur ---------- */
+@keyframes auraSpin { to { transform: rotate(360deg); } }
+@keyframes auraSpinReverse { to { transform: rotate(-360deg); } }
+@keyframes auraPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.07); }
+}
+@keyframes sparkFloat {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, -30px)) scale(1); opacity: 0; }
+}
+@keyframes chipIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.power-aura-ring {
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  border: 2px dashed var(--accent-color, var(--accent));
+  opacity: 0.5;
+  animation: auraSpin 7s linear infinite;
+  pointer-events: none;
+}
+
+.power-aura-ring.ring-2 {
+  inset: -28%;
+  border-style: solid;
+  border-width: 1px;
+  opacity: 0.3;
+  animation: auraSpinReverse 11s linear infinite, auraPulse 3.2s ease-in-out infinite;
+}
+
+.power-aura-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--accent-color, var(--accent));
+  box-shadow: 0 0 10px 3px var(--accent-color, var(--accent));
+  animation: sparkFloat 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
 
 #character-name {
   font-family: var(--font-display);
@@ -1473,6 +1533,18 @@ html, body {
   border: 1px solid var(--accent-color, var(--border));
   color: var(--text);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  animation: chipIn 0.4s ease forwards;
+  animation-delay: calc(var(--i, 0) * 0.07s);
+}
+
+.power-chip .power-chip-icon {
+  display: inline-block;
+  animation: auraPulse 2.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.07s);
 }
 
 /* ---------- Trailer: Hinweis im Panel + persistenter Mini-Player ---------- */

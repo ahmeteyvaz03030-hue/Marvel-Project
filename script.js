@@ -655,13 +655,13 @@
       const card = (entry) => {
         const films = entry.character.films || [];
         const firstYear = films.length ? Math.min(...films.map((f) => f.year)) : "–";
-        const powers = entry.character.powers || [];
-        const powerChips = powers
-          .map((p) => `<span class="power-chip" style="--accent-color:${entry.universe.accent}">${p}</span>`)
-          .join("");
+        const powerChips = powerChipsHTML(entry.character.powers, entry.universe.accent);
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
-            <div class="compare-avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
+            <div class="compare-avatar-wrap">
+              <div class="compare-avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
+              ${powerAuraHTML()}
+            </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
             <div class="compare-universe">${entry.universe.name}</div>
@@ -1307,6 +1307,52 @@
       .toUpperCase();
   }
 
+  // Animierte Energie-Aura (rotierende Ringe + aufsteigende Funken), die um
+  // die stilisierte Charakterfigur gelegt wird, um "Kräfte" spürbar zu machen —
+  // ohne echte Schauspieler-Abbildungen zu verwenden (siehe characterFigureSVG).
+  function powerAuraHTML() {
+    return `
+      <span class="power-aura-ring ring-1"></span>
+      <span class="power-aura-ring ring-2"></span>
+      <span class="power-aura-spark" style="--dx:-6px; --dy:-38px; animation-delay:0s"></span>
+      <span class="power-aura-spark" style="--dx:30px; --dy:22px; animation-delay:0.8s"></span>
+      <span class="power-aura-spark" style="--dx:-26px; --dy:24px; animation-delay:1.6s"></span>`;
+  }
+
+  const POWER_ICON_RULES = [
+    [/blitz|elektro/i, "⚡"],
+    [/feuer|flamme/i, "🔥"],
+    [/eis|kälte|frost/i, "❄️"],
+    [/flug|fliegen/i, "✈️"],
+    [/schild/i, "🛡️"],
+    [/netz/i, "🕸️"],
+    [/unsichtbar/i, "👻"],
+    [/telepath|geist|magie|zauber|mystis|portal|dimension/i, "✨"],
+    [/heilung|regenerat/i, "💚"],
+    [/laser|strahl|repulsor/i, "🔴"],
+    [/gift|säure/i, "☠️"],
+    [/klettern/i, "🕷️"],
+    [/geschwindigkeit|schnelligkeit|reflexe/i, "💨"],
+    [/rüstung|anzug|panzer|technolog/i, "🤖"],
+    [/kralle|klinge/i, "🗡️"],
+    [/wasser/i, "💧"],
+    [/sinn|sonar|gehör/i, "📡"],
+    [/kraft|stärke/i, "💪"],
+    [/intellekt|genie|erfinder/i, "🧠"],
+  ];
+  function powerIcon(power) {
+    const hit = POWER_ICON_RULES.find(([re]) => re.test(power));
+    return hit ? hit[1] : "⭐";
+  }
+  function powerChipsHTML(powers, accent) {
+    return (powers && powers.length ? powers : ["Keine Angaben"])
+      .map(
+        (p, i) => `<span class="power-chip" style="--accent-color:${accent}; --i:${i}">
+          <span class="power-chip-icon">${powerIcon(p)}</span>${p}</span>`
+      )
+      .join("");
+  }
+
   // Stilisierte "Figur" statt echtem Foto: Büsten-Silhouette mit Initialen,
   // eingefärbt in der Akzentfarbe des jeweiligen Universums.
   function characterFigureSVG(accent, initials) {
@@ -1331,6 +1377,9 @@
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
     document.getElementById("character-avatar").innerHTML = characterFigureSVG(accent, getInitials(c.name));
+    const avatarWrap = document.getElementById("character-avatar-wrap");
+    avatarWrap.querySelectorAll(".power-aura-ring, .power-aura-spark").forEach((el) => el.remove());
+    avatarWrap.insertAdjacentHTML("beforeend", powerAuraHTML());
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
 
@@ -1378,14 +1427,7 @@
     };
 
     const powersWrap = document.getElementById("character-powers");
-    powersWrap.innerHTML = "";
-    (c.powers || ["Keine Angaben"]).forEach((p) => {
-      const chip = document.createElement("span");
-      chip.className = "power-chip";
-      chip.style.setProperty("--accent-color", accent);
-      chip.textContent = p;
-      powersWrap.appendChild(chip);
-    });
+    powersWrap.innerHTML = powerChipsHTML(c.powers, accent);
 
     const filmsList = document.getElementById("character-films");
     filmsList.innerHTML = "";
