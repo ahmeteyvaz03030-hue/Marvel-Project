@@ -659,8 +659,7 @@
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar-wrap">
-              <div class="compare-avatar">${characterFigureSVG(entry.universe.accent, getInitials(entry.character.name))}</div>
-              ${powerAuraHTML()}
+              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, poseFor(entry.character), getInitials(entry.character.name))}</div>
             </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
@@ -1307,16 +1306,71 @@
       .toUpperCase();
   }
 
-  // Animierte Energie-Aura (rotierende Ringe + aufsteigende Funken), die um
-  // die stilisierte Charakterfigur gelegt wird, um "Kräfte" spürbar zu machen —
-  // ohne echte Schauspieler-Abbildungen zu verwenden (siehe characterFigureSVG).
-  function powerAuraHTML() {
-    return `
-      <span class="power-aura-ring ring-1"></span>
-      <span class="power-aura-ring ring-2"></span>
-      <span class="power-aura-spark" style="--dx:-6px; --dy:-38px; animation-delay:0s"></span>
-      <span class="power-aura-spark" style="--dx:30px; --dy:22px; animation-delay:0.8s"></span>
-      <span class="power-aura-spark" style="--dx:-26px; --dy:24px; animation-delay:1.6s"></span>`;
+  // Bestimmt eine grobe "Pose" für die animierte Aktionsfigur anhand der
+  // Kräfte des Charakters (Flug/Energie-Blast/Schild/neutrale Kampfhaltung).
+  function poseFor(character) {
+    const powers = (character.powers || []).join(" ").toLowerCase();
+    if (/flug|fliegen/.test(powers)) return "flight";
+    if (/schild/.test(powers)) return "shield";
+    if (/blitz|elektro|feuer|laser|strahl|repulsor|kosmisch/.test(powers)) return "blast";
+    return "stance";
+  }
+
+  // Animierte, komplett stilisierte Ganzkörper-"Aktionsfigur" statt echtem
+  // Schauspieler-Foto: eine abstrakte Silhouette mit leuchtenden Energiepunkten,
+  // die je nach Kräfte-Typ leicht unterschiedlich posiert und animiert ist
+  // (schwebende Bewegung, pulsierende Handenergie, wehender Umhang bei Flug).
+  function characterActionFigureSVG(accent, pose, initials) {
+    let arms;
+    let cape = "";
+    if (pose === "flight") {
+      cape = `<path class="figure-cape" d="M46 54 Q20 92 34 142 Q60 118 60 90 Q60 118 86 142 Q100 92 74 54 Z" fill="${accent}" opacity="0.22"/>`;
+      arms = `
+        <path d="M46 62 Q30 74 26 96" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M74 62 Q90 74 94 96" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <circle class="hand-glow" cx="26" cy="96" r="6" fill="${accent}"/>
+        <circle class="hand-glow" cx="94" cy="96" r="6" fill="${accent}"/>`;
+    } else if (pose === "blast") {
+      arms = `
+        <path d="M46 60 Q34 44 30 24" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M74 60 Q86 44 90 24" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <circle class="hand-glow hand-glow-strong" cx="30" cy="24" r="8" fill="${accent}"/>
+        <circle class="hand-glow hand-glow-strong" cx="90" cy="24" r="8" fill="${accent}"/>`;
+    } else if (pose === "shield") {
+      arms = `
+        <path d="M46 62 Q30 70 24 88" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M74 62 Q60 58 44 66" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <circle class="figure-shield" cx="38" cy="70" r="16" fill="none" stroke="${accent}" stroke-width="4"/>
+        <circle class="hand-glow" cx="24" cy="88" r="6" fill="${accent}"/>`;
+    } else {
+      arms = `
+        <path d="M46 62 Q36 78 38 98" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M74 62 Q84 78 82 98" stroke="#0d0e18" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <circle class="hand-glow" cx="38" cy="98" r="5" fill="${accent}"/>
+        <circle class="hand-glow" cx="82" cy="98" r="5" fill="${accent}"/>`;
+    }
+
+    return `<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" class="figure-pose-${pose}">
+      <defs>
+        <radialGradient id="fg" cx="50%" cy="28%" r="75%">
+          <stop offset="0%" stop-color="${accent}" stop-opacity="0.45"/>
+          <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="120" height="160" fill="#0a0b12"/>
+      <circle cx="60" cy="58" r="72" fill="url(#fg)"/>
+      <ellipse class="figure-shadow" cx="60" cy="150" rx="26" ry="6" fill="#000"/>
+      <g class="figure-body">
+        ${cape}
+        <path d="M50 118 Q46 138 44 152" stroke="#0d0e18" stroke-width="12" stroke-linecap="round" fill="none"/>
+        <path d="M70 118 Q74 138 76 152" stroke="#0d0e18" stroke-width="12" stroke-linecap="round" fill="none"/>
+        <path d="M42 66 Q60 58 78 66 Q82 92 70 118 Q60 124 50 118 Q38 92 42 66 Z" fill="#0d0e18"/>
+        <circle class="figure-chest" cx="60" cy="86" r="7" fill="${accent}"/>
+        ${arms}
+        <circle cx="60" cy="34" r="15" fill="#0d0e18" stroke="${accent}" stroke-width="2"/>
+        <text x="60" y="39" text-anchor="middle" font-family="Orbitron, sans-serif" font-size="11" font-weight="700" fill="${accent}">${initials}</text>
+      </g>
+    </svg>`;
   }
 
   const POWER_ICON_RULES = [
@@ -1376,10 +1430,7 @@
     const accent = universe.accent;
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
-    document.getElementById("character-avatar").innerHTML = characterFigureSVG(accent, getInitials(c.name));
-    const avatarWrap = document.getElementById("character-avatar-wrap");
-    avatarWrap.querySelectorAll(".power-aura-ring, .power-aura-spark").forEach((el) => el.remove());
-    avatarWrap.insertAdjacentHTML("beforeend", powerAuraHTML());
+    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, poseFor(c), getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
 
