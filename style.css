@@ -1269,7 +1269,7 @@ html, body {
 .compare-avatar-wrap {
   position: relative;
   width: 96px;
-  height: 120px;
+  height: 136px;
   margin: 0 auto 10px;
 }
 
@@ -1367,7 +1367,7 @@ html, body {
 #character-avatar-wrap {
   position: relative;
   width: 168px;
-  height: 210px;
+  height: 238px;
   margin: 6px auto 14px;
 }
 
