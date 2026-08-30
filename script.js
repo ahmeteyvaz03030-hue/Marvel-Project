@@ -659,7 +659,7 @@
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar-wrap">
-              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, entry.character.alignment, powerEffectFor(entry.character), gearFor(entry.character), getInitials(entry.character.name))}</div>
+              <div class="compare-avatar">${characterVisualHTML(entry.character, entry.universe, getInitials(entry.character.name))}</div>
             </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
@@ -1414,6 +1414,22 @@
     </g>`;
   }
 
+  // Zeigt ein eigenes Bild (character.image, z.B. selbst erzeugte/legal
+  // nutzbare Kunst aus assets/characters/), falls hinterlegt — sonst greift
+  // automatisch das generierte Poster-Portrait als Fallback.
+  function characterVisualHTML(character, universe, initials) {
+    if (character.image) {
+      return `<img src="${character.image}" alt="${character.name}" loading="lazy">`;
+    }
+    return characterActionFigureSVG(
+      universe.accent,
+      character.alignment,
+      powerEffectFor(character),
+      gearFor(character),
+      initials
+    );
+  }
+
   // Stilisiertes Poster-Portrait statt echtem Schauspieler-Foto: eine
   // schattierte Büsten-Silhouette mit dramatischem Streiflicht (wie ein
   // Filmposter) und einem zur Kraft passenden Leucht-Effekt (Blitze, Feuer,
@@ -1509,7 +1525,7 @@
     const accent = universe.accent;
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
-    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, c.alignment, powerEffectFor(c), gearFor(c), getInitials(c.name));
+    document.getElementById("character-avatar").innerHTML = characterVisualHTML(c, universe, getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
 
