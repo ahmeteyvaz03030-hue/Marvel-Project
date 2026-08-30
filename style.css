@@ -1477,6 +1477,41 @@ html, body {
 }
 .poster-effect-aura .spark-2 { animation-delay: 1s; }
 
+/* ---------- Ikonische Ausrüstung: Schild, Flügel, Rüstung ---------- */
+@keyframes wingFlutter {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes coreGlow {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+@keyframes shieldGlint {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.55; }
+}
+
+.poster-gear-wings .wing {
+  transform-box: fill-box;
+  transform-origin: center right;
+  animation: wingFlutter 2.4s ease-in-out infinite;
+}
+.poster-gear-wings .wing-right {
+  transform-origin: center left;
+  animation-delay: 0.2s;
+}
+.poster-gear-armor .gear-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 5px var(--accent-color, currentColor));
+  animation: coreGlow 2s ease-in-out infinite;
+}
+.poster-gear-shield {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: shieldGlint 3s ease-in-out infinite;
+}
+
 #character-name {
   font-family: var(--font-display);
   font-size: 22px;

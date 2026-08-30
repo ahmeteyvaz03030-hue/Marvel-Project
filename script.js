@@ -659,7 +659,7 @@
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar-wrap">
-              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, entry.character.alignment, powerEffectFor(entry.character), getInitials(entry.character.name))}</div>
+              <div class="compare-avatar">${characterActionFigureSVG(entry.universe.accent, entry.character.alignment, powerEffectFor(entry.character), gearFor(entry.character), getInitials(entry.character.name))}</div>
             </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
@@ -1317,6 +1317,44 @@
     return "aura";
   }
 
+  // Erkennt ikonische Ausrüstung anhand von Name/Rolle/Kräften, damit das
+  // Poster-Portrait passendes Zubehör bekommt (Schild, Flügel, Rüstung).
+  function gearFor(character) {
+    const name = `${character.name} ${character.role} ${character.bio || ""}`.toLowerCase();
+    const powers = (character.powers || []).join(" ").toLowerCase();
+    const gear = [];
+    if (/captain america/.test(name) || /vibranium-schild|wurfschild/.test(powers)) gear.push("shield");
+    if (/falcon/.test(name)) gear.push("wings");
+    if (/iron man|war machine|rescue|iron patriot/.test(name) || /rüstung|anzug|panzer|technolog/.test(powers)) gear.push("armor");
+    return gear;
+  }
+
+  function gearSVG(accent, gear) {
+    if (gear === "shield") {
+      return `<g class="poster-gear poster-gear-shield">
+        <circle cx="80" cy="100" r="16" fill="${accent}" stroke="#e9edf7" stroke-width="2.5"/>
+        <circle cx="80" cy="100" r="11" fill="none" stroke="#e9edf7" stroke-width="2"/>
+        <circle cx="80" cy="100" r="6" fill="#e9edf7"/>
+        <path d="M80 92 L82.5 97.5 L88.5 98 L84 102 L85.5 108 L80 104.5 L74.5 108 L76 102 L71.5 98 L77.5 97.5 Z" fill="${accent}"/>
+      </g>`;
+    }
+    if (gear === "wings") {
+      return `<g class="poster-gear poster-gear-wings">
+        <path class="wing wing-left" d="M26 86 Q2 80 0 56 Q18 64 30 82 Z" fill="${accent}" opacity="0.9"/>
+        <path class="wing wing-right" d="M74 86 Q98 80 100 56 Q82 64 70 82 Z" fill="${accent}" opacity="0.9"/>
+      </g>`;
+    }
+    if (gear === "armor") {
+      return `<g class="poster-gear poster-gear-armor">
+        <path d="M40 86 L44 116 M60 86 L56 116" stroke="#05060a" stroke-width="1.4" opacity="0.55"/>
+        <path d="M30 94 L38 90 M70 94 L62 90" stroke="#05060a" stroke-width="1.4" opacity="0.4"/>
+        <circle class="gear-core" cx="50" cy="94" r="8" fill="none" stroke="${accent}" stroke-width="1.6"/>
+        <circle class="gear-core" cx="50" cy="94" r="4.2" fill="#f4f8ff"/>
+      </g>`;
+    }
+    return "";
+  }
+
   // Hellt (percent>0) oder dunkelt (percent<0) eine Hex-Farbe ab.
   function shadeColor(hex, percent) {
     const num = parseInt(hex.replace("#", ""), 16);
@@ -1380,9 +1418,12 @@
   // schattierte Büsten-Silhouette mit dramatischem Streiflicht (wie ein
   // Filmposter) und einem zur Kraft passenden Leucht-Effekt (Blitze, Feuer,
   // Energie-Orbs, Schild-Bögen, Netz-Linien oder sanfte Aura) im Hintergrund.
-  function characterActionFigureSVG(accent, alignment, effect, initials) {
+  function characterActionFigureSVG(accent, alignment, effect, gear, initials) {
     const rim = rimColorFor(accent, alignment);
     const silhouette = shadeColor(accent, -46);
+    const wingsHTML = gear.includes("wings") ? gearSVG(accent, "wings") : "";
+    const armorHTML = gear.includes("armor") ? gearSVG(accent, "armor") : "";
+    const shieldHTML = gear.includes("shield") ? gearSVG(accent, "shield") : "";
 
     return `<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg" class="poster-pose-${effect}">
       <defs>
@@ -1398,9 +1439,12 @@
       <rect width="100" height="130" fill="#090a11"/>
       <rect width="100" height="130" fill="url(#key)"/>
       ${powerEffectSVG(accent, effect)}
+      ${wingsHTML}
       <path d="M8 130 Q6 96 22 84 Q34 78 50 78 Q66 78 78 84 Q94 96 92 130 Z" fill="${silhouette}"/>
+      ${armorHTML}
       <path d="M34 40 Q34 18 50 16 Q66 18 66 40 Q66 56 58 62 Q50 66 42 62 Q34 56 34 40 Z" fill="url(#head-shade)"/>
       <path class="poster-rim" d="M66 40 Q66 56 58 62 M78 84 Q94 96 92 130" stroke="${rim}" stroke-width="2" fill="none" opacity="0.85"/>
+      ${shieldHTML}
       <g class="poster-badge">
         <rect x="6" y="106" width="30" height="18" rx="4" fill="rgba(6,7,14,0.72)" stroke="${accent}" stroke-width="1.5"/>
         <text x="21" y="118.5" text-anchor="middle" font-family="Orbitron, sans-serif" font-size="9" font-weight="700" fill="${accent}">${initials}</text>
@@ -1465,7 +1509,7 @@
     const accent = universe.accent;
     const modal = document.getElementById("character-modal");
     document.getElementById("character-card").style.setProperty("--accent-color", accent);
-    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, c.alignment, powerEffectFor(c), getInitials(c.name));
+    document.getElementById("character-avatar").innerHTML = characterActionFigureSVG(accent, c.alignment, powerEffectFor(c), gearFor(c), getInitials(c.name));
     document.getElementById("character-name").textContent = c.name;
     document.getElementById("character-role").textContent = c.role;
 
