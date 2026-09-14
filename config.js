@@ -13,7 +13,7 @@
 // fehlt, greift automatisch die generierte Grafik als Fallback.
 window.MARVEL_CONFIG = {
   // TMDB API-Key (v3). Leer lassen = Bilder aus, generierte Grafiken werden genutzt.
-  tmdbApiKey: "",
+  tmdbApiKey: "d7b2e68bd235042bd3e895e8eb7522a2",
 
   // Sprache für Titel/Bilder der TMDB-Suche.
   tmdbLanguage: "de-DE",
@@ -23,5 +23,5 @@ window.MARVEL_CONFIG = {
 
   // Auf true setzen, um die Bildsuche Schritt für Schritt in der Browser-Konsole
   // mitzuschreiben (Film-ID, gefundene Besetzung, profile_path, fertige Bild-URL).
-  debugImages: false,
+  debugImages: true,
 };
