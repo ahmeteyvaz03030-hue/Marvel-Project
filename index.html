@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=29">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -16,21 +16,51 @@
   <div id="vignette"></div>
 
   <div id="user-gate">
+    <div id="gate-starfield"></div>
+
     <div class="gate-card-wrap">
       <div class="gate-eyebrow">MULTIVERSUM-ZUGANG</div>
       <h2 id="gate-heading">Wähle deinen Avatar</h2>
       <p id="gate-sub">Wer betritt heute das Marvel-Multiversum?</p>
       <div id="gate-cards"></div>
+      <p id="gate-notice" class="hidden" role="status"></p>
+      <p id="gate-footer">Gesicherter Multiversum-Zugang</p>
+    </div>
 
-      <div id="gate-create-form" class="hidden">
-        <input id="gate-create-name" type="text" placeholder="Dein Name" maxlength="20" autocomplete="off">
-        <input id="gate-create-hero" type="text" placeholder="Lieblingsheld (optional)" maxlength="30" autocomplete="off">
-        <div id="gate-color-picker"></div>
-        <div class="gate-create-actions">
-          <button id="gate-create-cancel">Abbrechen</button>
-          <button id="gate-create-confirm">Erstellen</button>
-        </div>
+    <!-- PIN-Dialog: erscheint erst nach Auswahl eines Profils -->
+    <div id="pin-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pin-name">
+      <div id="pin-card">
+        <button id="pin-close" type="button" aria-label="Zurück zur Profilauswahl">✕</button>
+        <div class="gate-eyebrow">MULTIVERSUM-ZUGANG</div>
+
+        <div id="pin-avatar" aria-hidden="true"></div>
+        <h3 id="pin-name">—</h3>
+        <p id="pin-hero"></p>
+
+        <div id="pin-dots" aria-hidden="true"></div>
+        <label id="pin-label" for="pin-input">PIN eingeben</label>
+        <!-- Unsichtbares Feld: fängt Tastatur und mobile Zifferntastatur ab -->
+        <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*"
+               autocomplete="off" maxlength="8" aria-label="PIN eingeben">
+
+        <div id="pin-keypad" aria-label="Zifferntastatur"></div>
+
+        <label id="pin-remember-row">
+          <input id="pin-remember" type="checkbox">
+          <span>Auf diesem Gerät merken (14 Tage)</span>
+        </label>
+
+        <button id="pin-submit" type="button">Zugang bestätigen</button>
+        <p id="pin-status" role="alert"></p>
+        <p class="pin-footer">Gesicherter Multiversum-Zugang</p>
       </div>
+    </div>
+
+    <!-- Kurze Bestätigungs-Sequenz nach erfolgreicher PIN -->
+    <div id="gate-success" class="hidden" aria-hidden="true">
+      <div id="gate-success-ring"></div>
+      <div id="gate-success-title">IDENTITÄT BESTÄTIGT</div>
+      <div id="gate-success-name"></div>
     </div>
   </div>
 
@@ -41,7 +71,8 @@
       <small id="profile-hero"></small>
     </div>
     <button id="sound-toggle" title="Sound an/aus">🔊</button>
-    <button id="profile-switch" title="Benutzer wechseln">⇄</button>
+    <button id="profile-switch" title="Profil wechseln">⇄</button>
+    <button id="profile-logout" title="Abmelden">⏻</button>
   </div>
 
   <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
@@ -372,10 +403,11 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="config.js?v=29"></script>
-  <script src="tmdb.js?v=29"></script>
-  <script src="data.js?v=29"></script>
-  <script src="derive.js?v=29"></script>
-  <script src="script.js?v=29"></script>
+  <script src="config.js?v=30"></script>
+  <script src="tmdb.js?v=30"></script>
+  <script src="data.js?v=30"></script>
+  <script src="derive.js?v=30"></script>
+  <script src="auth.js?v=30"></script>
+  <script src="script.js?v=30"></script>
 </body>
 </html>

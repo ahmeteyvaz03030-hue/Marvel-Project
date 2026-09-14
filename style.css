@@ -492,23 +492,6 @@ html, body {
 
 .gate-card { position: relative; }
 
-.gate-card-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.4);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 11px;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.gate-card-remove:hover { color: #ff6b6b; border-color: #ff6b6b; }
-
 .gate-card-create {
   border-style: dashed;
   display: flex;
@@ -528,80 +511,6 @@ html, body {
   justify-content: center;
   font-size: 34px;
   color: var(--text-dim);
-}
-
-/* ---------- Eigenen Benutzer erstellen ---------- */
-#gate-create-form {
-  margin-top: 26px;
-  max-width: 340px;
-  margin-left: auto;
-  margin-right: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-#gate-create-form.hidden { display: none; }
-
-#gate-create-form input {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 11px 14px;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 14px;
-  outline: none;
-  width: 100%;
-}
-
-#gate-create-form input:focus { border-color: var(--accent); }
-
-#gate-color-picker {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 4px 0;
-}
-
-.gate-color-swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.gate-color-swatch:hover { transform: scale(1.12); }
-.gate-color-swatch.active { border-color: #fff; transform: scale(1.15); }
-
-.gate-create-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.gate-create-actions button {
-  flex: 1;
-  padding: 11px;
-  border-radius: 10px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 1px;
-  cursor: pointer;
-}
-
-#gate-create-cancel {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-#gate-create-confirm {
-  background: linear-gradient(135deg, rgba(255,77,77,0.4), rgba(90,60,255,0.35));
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
 }
 
 /* ---------- Search (Charaktere & Filme) ---------- */
@@ -2207,6 +2116,9 @@ html, body {
 
   #gate-cards { gap: 14px; }
   .gate-card { width: 140px; padding: 16px 10px; }
+  /* "Neuer Benutzer" nicht größer wirken lassen als die echten Profile */
+  .gate-card-create .gate-avatar-plus { width: 64px; height: 64px; font-size: 28px; margin-bottom: 10px; }
+  .gate-card-create .gate-hero { font-size: 11.5px; }
   #compare-pickers { flex-direction: column; }
   .compare-vs-label { display: none; }
 
@@ -3302,4 +3214,459 @@ body.stone-surge #scene { animation: stoneSurge 2.4s ease; }
   #jarvis-panel { bottom: 108px; max-height: 60vh; }
   #panel-hero { padding-top: 48px; }
   #map-panel, #film-card, #character-card { max-height: 92vh; }
+}
+
+/* ===========================================================================
+   Zugangsbereich: aufgewertete Profilkarten, PIN-Dialog, Bestätigungs-Sequenz
+   =========================================================================== */
+
+/* Dezente Sternenbewegung hinter dem Zugangsscreen */
+#gate-starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, rgba(255,255,255,0.75) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 78% 14%, rgba(180,210,255,0.7) 50%, transparent 52%),
+    radial-gradient(1.6px 1.6px at 62% 68%, rgba(255,255,255,0.6) 50%, transparent 52%),
+    radial-gradient(1.1px 1.1px at 28% 78%, rgba(255,220,190,0.6) 50%, transparent 52%),
+    radial-gradient(1.3px 1.3px at 88% 56%, rgba(255,255,255,0.55) 50%, transparent 52%),
+    radial-gradient(1px 1px at 42% 38%, rgba(200,220,255,0.6) 50%, transparent 52%),
+    radial-gradient(ellipse at 50% 45%, rgba(70,110,220,0.12) 0%, rgba(0,0,0,0) 62%);
+  background-size: 100% 100%;
+  animation: gateDrift 28s ease-in-out infinite alternate;
+}
+
+@keyframes gateDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-14px, -10px, 0) scale(1.04); }
+}
+
+.gate-card-wrap { position: relative; z-index: 1; }
+
+#gate-footer {
+  margin-top: 26px;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  opacity: 0.65;
+  text-transform: uppercase;
+}
+
+#gate-notice {
+  margin-top: 18px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  display: inline-block;
+}
+
+#gate-notice.hidden { display: none; }
+
+/* ---------- Profilkarten: Glas, Glow, HUD-Details ---------- */
+.gate-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(165deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  backdrop-filter: blur(12px) saturate(130%);
+  box-shadow:
+    0 18px 40px -22px rgba(0,0,0,0.9),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Farbschimmer in der Heldenfarbe (Captain America blau, Iron Man gold/rot) */
+.gate-card-glow {
+  position: absolute;
+  inset: -40% -40% auto -40%;
+  height: 150%;
+  background: radial-gradient(ellipse at 50% 0%,
+    color-mix(in srgb, var(--hero-color, var(--accent)) 45%, transparent) 0%,
+    rgba(0,0,0,0) 62%);
+  opacity: 0.35;
+  transition: opacity 0.3s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+
+.gate-card::after {
+  /* feine HUD-Linie am oberen Rand */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hero-color, var(--accent)), transparent);
+  opacity: 0.5;
+}
+
+.gate-card-lock {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#user-gate.auth-on .gate-card-lock { opacity: 0.45; }
+
+.gate-card:hover,
+.gate-card:focus-visible {
+  border-color: color-mix(in srgb, var(--hero-color, var(--accent)) 70%, transparent);
+  box-shadow:
+    0 26px 52px -24px color-mix(in srgb, var(--hero-color, var(--accent)) 75%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.14);
+}
+
+.gate-card:hover .gate-card-glow,
+.gate-card:focus-visible .gate-card-glow { opacity: 0.7; transform: translateY(-6px); }
+.gate-card:hover .gate-avatar { filter: brightness(1.15); transform: scale(1.04); }
+.gate-card:hover .gate-card-lock { opacity: 0.85; }
+.gate-card .gate-avatar { transition: transform 0.3s ease, filter 0.3s ease; }
+
+/* Auswahl: gewählte Karte hervorheben, andere abdunkeln */
+#user-gate.picking .gate-card:not(.chosen) {
+  opacity: 0.32;
+  filter: saturate(0.5);
+  transform: scale(0.97);
+}
+
+#user-gate.picking .gate-card.chosen {
+  transform: translateY(-8px) scale(1.03);
+  border-color: var(--hero-color, var(--accent));
+  box-shadow: 0 30px 60px -24px color-mix(in srgb, var(--hero-color, var(--accent)) 85%, transparent);
+}
+
+#user-gate.picking .gate-card.chosen .gate-card-glow { opacity: 0.85; }
+
+/* ---------- PIN-Dialog ---------- */
+#pin-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(3, 4, 10, 0.72);
+  backdrop-filter: blur(14px);
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#pin-dialog.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+#pin-card {
+  position: relative;
+  width: min(360px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 30px 26px 24px;
+  text-align: center;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--hero-color, var(--accent)) 45%, var(--border));
+  background: linear-gradient(170deg, rgba(16,20,34,0.96), rgba(6,8,15,0.98));
+  box-shadow:
+    0 40px 90px -40px rgba(0,0,0,0.95),
+    0 0 40px -24px color-mix(in srgb, var(--hero-color, var(--accent)) 80%, transparent);
+  animation: pinIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pinIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+#pin-card.error { animation: pinShake 0.45s ease; border-color: #ff4d5e; }
+
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-9px); }
+  30% { transform: translateX(8px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(5px); }
+  80% { transform: translateX(-2px); }
+}
+
+#pin-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#pin-avatar {
+  width: 78px;
+  height: 78px;
+  margin: 14px auto 12px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.12),
+    0 0 30px -8px var(--hero-color, var(--accent));
+}
+
+#pin-avatar svg { width: 100%; height: 100%; display: block; }
+
+#pin-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: #fff;
+  margin: 0 0 4px;
+}
+
+#pin-hero {
+  font-size: 12.5px;
+  color: var(--hero-color, var(--accent));
+  margin: 0 0 22px;
+}
+
+#pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-height: 16px;
+}
+
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--hero-color, var(--accent)) 60%, var(--border));
+  background: transparent;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pin-dot.filled {
+  background: var(--hero-color, var(--accent));
+  transform: scale(1.12);
+  box-shadow: 0 0 12px -1px var(--hero-color, var(--accent));
+}
+
+#pin-card.error .pin-dot { border-color: #ff4d5e; }
+
+#pin-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+/* Das echte Feld bleibt unsichtbar, fängt aber Tastatur und Touch ab */
+#pin-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+#pin-input:focus-visible + #pin-keypad { outline: none; }
+
+/* Sichtbarer Fokus, wenn per Tastatur bedient wird */
+#pin-dialog:focus-within #pin-dots {
+  outline: 1px solid color-mix(in srgb, var(--hero-color, var(--accent)) 45%, transparent);
+  outline-offset: 10px;
+  border-radius: 20px;
+}
+
+#pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.pin-key {
+  padding: 13px 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.045);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+.pin-key:hover,
+.pin-key:focus-visible {
+  background: rgba(255,255,255,0.1);
+  border-color: color-mix(in srgb, var(--hero-color, var(--accent)) 60%, transparent);
+}
+
+.pin-key:active { transform: scale(0.95); }
+.pin-key-alt { color: var(--text-dim); font-size: 14px; }
+
+#pin-remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+#pin-remember { width: 15px; height: 15px; accent-color: var(--hero-color, var(--accent)); cursor: pointer; }
+
+#pin-submit {
+  width: 100%;
+  padding: 13px;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  letter-spacing: 2px;
+  color: #fff;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--hero-color, var(--accent)) 65%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--hero-color, var(--accent)) 38%, transparent),
+    rgba(255,255,255,0.05));
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+#pin-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -16px var(--hero-color, var(--accent));
+}
+
+#pin-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+#pin-status {
+  min-height: 18px;
+  margin: 12px 0 4px;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 1.6px;
+}
+
+#pin-status.denied { color: #ff5c6c; text-shadow: 0 0 16px rgba(255,77,94,0.5); }
+#pin-status.checking { color: var(--text-dim); }
+
+.pin-footer {
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  opacity: 0.6;
+  margin: 6px 0 0;
+  text-transform: uppercase;
+}
+
+/* ---------- Bestätigung nach erfolgreicher PIN ---------- */
+#gate-success {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(3, 4, 10, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+#gate-success.hidden { display: none; }
+
+#gate-success-ring {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  box-shadow: 0 0 40px -8px var(--accent);
+  animation: successRing 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes successRing {
+  0% { transform: rotate(0deg) scale(0.6); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: rotate(540deg) scale(1); opacity: 1; }
+}
+
+#gate-success-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 5px;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(120,190,255,0.6);
+  animation: successFade 0.5s ease 0.25s both;
+}
+
+#gate-success-name {
+  font-size: 14px;
+  color: var(--text-dim);
+  animation: successFade 0.5s ease 0.55s both;
+}
+
+@keyframes successFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Karten weichen beim Übergang leicht zurück */
+#user-gate.confirmed .gate-card-wrap {
+  transform: scale(0.96);
+  opacity: 0.4;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+/* Abmelde-Knopf im Profil-Badge (gleiche Optik wie Profilwechsel) */
+#profile-logout {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+#profile-logout:hover { color: #ff6b7a; border-color: #ff6b7a; }
+
+/* ---------- Kleinere Bildschirme ---------- */
+@media (max-width: 640px) {
+  #pin-card { padding: 24px 18px 20px; border-radius: 18px; }
+  #pin-avatar { width: 64px; height: 64px; }
+  #pin-name { font-size: 17px; }
+  .pin-key { padding: 15px 0; font-size: 18px; }
+  #gate-footer { margin-top: 18px; font-size: 8.5px; }
+  #gate-success-title { font-size: 12px; letter-spacing: 3px; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  #pin-card { max-height: 96vh; padding: 18px 18px 14px; }
+  #pin-avatar { width: 48px; height: 48px; margin: 6px auto 8px; }
+  #pin-keypad { gap: 6px; margin-bottom: 12px; }
+  .pin-key { padding: 8px 0; font-size: 15px; }
+  #pin-hero { margin-bottom: 12px; }
+}
+
+/* Bewegungsreduzierung respektieren */
+@media (prefers-reduced-motion: reduce) {
+  #gate-starfield { animation: none; }
+  #pin-card, #pin-card.error { animation: none; }
+  #gate-success-ring, #gate-success-title, #gate-success-name { animation: none; }
 }

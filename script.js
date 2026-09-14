@@ -271,124 +271,248 @@
     return idx === -1;
   }
 
-  // ---------- User gate (Profilauswahl) ----------
-  const GATE_COLORS = ["#ff4d4d", "#5b8bff", "#38d4e0", "#ffce54", "#8a2be2", "#2ecc71", "#ff6a3c", "#ff4d9e"];
-
-  function loadCustomUsers() {
-    try {
-      return JSON.parse(localStorage.getItem("marvelCustomUsers") || "{}");
-    } catch (e) {
-      return {};
-    }
-  }
-  function saveCustomUsers(map) {
-    try {
-      localStorage.setItem("marvelCustomUsers", JSON.stringify(map));
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
+  // ---------- User gate (Profilauswahl + PIN-Zugang) ----------
+  // Die Profile selbst stehen zentral in data.js (AVATARS). Hier kommt nur der
+  // Ablauf dazu: Profil wählen → PIN prüfen lassen → Multiversum öffnen.
   function initUserGate() {
     const gate = document.getElementById("user-gate");
     const cardsWrap = document.getElementById("gate-cards");
-    const createForm = document.getElementById("gate-create-form");
-    const nameInput = document.getElementById("gate-create-name");
-    const heroInput = document.getElementById("gate-create-hero");
-    const colorPicker = document.getElementById("gate-color-picker");
+    const notice = document.getElementById("gate-notice");
 
-    let customUsers = loadCustomUsers();
-    let allUsers = Object.assign({}, AVATARS, customUsers);
-    let pickedColor = GATE_COLORS[0];
+    const dialog = document.getElementById("pin-dialog");
+    const pinInput = document.getElementById("pin-input");
+    const pinDots = document.getElementById("pin-dots");
+    const pinKeypad = document.getElementById("pin-keypad");
+    const pinStatus = document.getElementById("pin-status");
+    const pinSubmit = document.getElementById("pin-submit");
+    const pinRemember = document.getElementById("pin-remember");
+    const success = document.getElementById("gate-success");
+
+    const MIN_PIN = 4;
+    const MAX_PIN = 8;
+
+    const allUsers = AVATARS;
+    let authRequired = false; // wird aus dem Worker-Status gesetzt
+    let pendingId = null; // Profil, dessen PIN gerade abgefragt wird
+    let busy = false;
 
     function avatarSvgFor(u) {
       return u.svg || characterFigureSVG(u.color, getInitials(u.name));
     }
 
+    function showNotice(text) {
+      notice.textContent = text;
+      notice.classList.remove("hidden");
+      clearTimeout(showNotice.timer);
+      showNotice.timer = setTimeout(() => notice.classList.add("hidden"), 4200);
+    }
+
+    // ---------- Profilkarten ----------
     function renderCards() {
       cardsWrap.innerHTML = "";
       Object.entries(allUsers).forEach(([id, u]) => {
         const card = document.createElement("button");
         card.className = "gate-card";
+        card.type = "button";
+        card.dataset.profile = id;
         card.style.setProperty("--hero-color", u.color);
         card.innerHTML = `
+          <span class="gate-card-glow" aria-hidden="true"></span>
+          <span class="gate-card-lock" aria-hidden="true">🔒</span>
           <div class="gate-avatar">${avatarSvgFor(u)}</div>
           <div class="gate-name">${u.name}</div>
           <div class="gate-hero">${u.hero}</div>`;
-        card.addEventListener("click", () => selectUser(id));
-        if (customUsers[id]) {
-          const remove = document.createElement("button");
-          remove.className = "gate-card-remove";
-          remove.type = "button";
-          remove.title = "Profil löschen";
-          remove.textContent = "✕";
-          remove.addEventListener("click", (e) => {
-            e.stopPropagation();
-            delete customUsers[id];
-            delete allUsers[id];
-            saveCustomUsers(customUsers);
-            renderCards();
-          });
-          card.appendChild(remove);
-        }
+        card.addEventListener("click", () => chooseProfile(id));
         cardsWrap.appendChild(card);
       });
 
+      // Bleibt erhalten, legt aber bewusst noch kein Profil an: dafür bräuchte
+      // es eine sichere serverseitige Ablage der PIN.
       const createCard = document.createElement("button");
       createCard.className = "gate-card gate-card-create";
+      createCard.type = "button";
       createCard.innerHTML = `
         <div class="gate-avatar-plus">+</div>
         <div class="gate-name">Neuer Benutzer</div>
         <div class="gate-hero">Eigenes Profil erstellen</div>`;
-      createCard.addEventListener("click", openCreateForm);
+      createCard.addEventListener("click", () => {
+        Sound.playClick();
+        showNotice("Neue Profile werden demnächst unterstützt.");
+      });
       cardsWrap.appendChild(createCard);
     }
 
-    function openCreateForm() {
-      cardsWrap.classList.add("hidden");
-      createForm.classList.remove("hidden");
-      nameInput.value = "";
-      heroInput.value = "";
-      pickedColor = GATE_COLORS[Math.floor(Math.random() * GATE_COLORS.length)];
-      colorPicker.innerHTML = "";
-      GATE_COLORS.forEach((c) => {
-        const sw = document.createElement("button");
-        sw.type = "button";
-        sw.className = "gate-color-swatch" + (c === pickedColor ? " active" : "");
-        sw.style.background = c;
-        sw.addEventListener("click", () => {
-          pickedColor = c;
-          colorPicker.querySelectorAll(".gate-color-swatch").forEach((el) => el.classList.remove("active"));
-          sw.classList.add("active");
+    // ---------- PIN-Dialog ----------
+    function renderDots() {
+      const filled = pinInput.value.length;
+      const slots = Math.max(MIN_PIN, Math.min(MAX_PIN, filled + (filled >= MIN_PIN ? 1 : 0)));
+      pinDots.innerHTML = "";
+      for (let i = 0; i < slots; i++) {
+        const dot = document.createElement("span");
+        dot.className = "pin-dot" + (i < filled ? " filled" : "");
+        pinDots.appendChild(dot);
+      }
+      pinSubmit.disabled = filled < MIN_PIN;
+    }
+
+    function buildKeypad() {
+      pinKeypad.innerHTML = "";
+      const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "clear", "0", "back"];
+      keys.forEach((key) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pin-key" + (key === "clear" || key === "back" ? " pin-key-alt" : "");
+        btn.textContent = key === "clear" ? "C" : key === "back" ? "⌫" : key;
+        btn.setAttribute("aria-label", key === "clear" ? "Eingabe löschen" : key === "back" ? "Letzte Ziffer löschen" : key);
+        btn.addEventListener("click", () => {
+          if (key === "clear") pinInput.value = "";
+          else if (key === "back") pinInput.value = pinInput.value.slice(0, -1);
+          else if (pinInput.value.length < MAX_PIN) pinInput.value += key;
+          clearError();
+          renderDots();
+          pinInput.focus();
         });
-        colorPicker.appendChild(sw);
+        pinKeypad.appendChild(btn);
       });
-      nameInput.focus();
     }
 
-    function closeCreateForm() {
-      createForm.classList.add("hidden");
-      cardsWrap.classList.remove("hidden");
+    function clearError() {
+      pinStatus.textContent = "";
+      pinStatus.className = "";
+      document.getElementById("pin-card").classList.remove("error");
     }
 
-    document.getElementById("gate-create-cancel").addEventListener("click", closeCreateForm);
+    function showError(text) {
+      const card = document.getElementById("pin-card");
+      pinStatus.textContent = text;
+      pinStatus.className = "denied";
+      card.classList.remove("error");
+      // Neustart der Shake-Animation erzwingen
+      void card.offsetWidth;
+      card.classList.add("error");
+      pinInput.value = "";
+      renderDots();
+    }
 
-    document.getElementById("gate-create-confirm").addEventListener("click", () => {
-      const name = nameInput.value.trim();
-      if (!name) {
-        nameInput.focus();
+    function openPinDialog(id) {
+      const u = allUsers[id];
+      if (!u) return;
+      pendingId = id;
+
+      document.getElementById("pin-avatar").innerHTML = avatarSvgFor(u);
+      document.getElementById("pin-name").textContent = u.name.toUpperCase();
+      document.getElementById("pin-hero").textContent = u.hero;
+      document.getElementById("pin-card").style.setProperty("--hero-color", u.color);
+
+      pinInput.value = "";
+      pinRemember.checked = false;
+      clearError();
+      renderDots();
+
+      gate.classList.add("picking");
+      cardsWrap.querySelectorAll(".gate-card").forEach((card) => {
+        card.classList.toggle("chosen", card.dataset.profile === id);
+      });
+
+      dialog.classList.remove("hidden");
+      setTimeout(() => pinInput.focus(), 120);
+    }
+
+    function closePinDialog() {
+      pendingId = null;
+      dialog.classList.add("hidden");
+      gate.classList.remove("picking");
+      cardsWrap.querySelectorAll(".gate-card").forEach((card) => card.classList.remove("chosen"));
+      pinInput.value = "";
+      clearError();
+    }
+
+    // ---------- Anmelden ----------
+    function chooseProfile(id) {
+      Sound.playClick();
+      if (!authRequired) {
+        // Anmeldung ist (noch) nicht eingerichtet → bisheriges Verhalten.
+        enterMultiverse(id, true);
         return;
       }
-      const hero = heroInput.value.trim() || "Multiversum-Reisende:r";
-      const id = "u" + Date.now().toString(36);
-      const user = { name, hero, color: pickedColor };
-      customUsers[id] = user;
-      allUsers[id] = user;
-      saveCustomUsers(customUsers);
-      closeCreateForm();
-      renderCards();
-      selectUser(id);
-    });
+      openPinDialog(id);
+    }
+
+    function submitPin() {
+      if (busy || !pendingId) return;
+      const pin = pinInput.value;
+      if (pin.length < MIN_PIN) {
+        showError("Bitte mindestens " + MIN_PIN + " Ziffern eingeben.");
+        return;
+      }
+
+      busy = true;
+      pinSubmit.disabled = true;
+      pinStatus.className = "checking";
+      pinStatus.textContent = "Autorisierung läuft…";
+
+      MarvelAuth.login(pendingId, pin, pinRemember.checked)
+        .then((result) => {
+          busy = false;
+          // Die eingegebene PIN wird sofort verworfen.
+          pinInput.value = "";
+          renderDots();
+
+          if (result.ok) {
+            const id = pendingId;
+            dialog.classList.add("hidden");
+            enterMultiverse(id, false);
+            return;
+          }
+          if (result.reason === "locked") {
+            showError("Zu viele Versuche — bitte " + result.retryAfter + " Sekunden warten.");
+          } else if (result.reason === "offline") {
+            showError("Zugangsserver nicht erreichbar.");
+          } else if (result.reason === "not-configured") {
+            showError("Für dieses Profil ist noch keine PIN hinterlegt.");
+          } else {
+            showError("ZUGANG VERWEIGERT");
+          }
+        })
+        .catch(() => {
+          busy = false;
+          pinInput.value = "";
+          renderDots();
+          showError("ZUGANG VERWEIGERT");
+        });
+    }
+
+    // ---------- Übergang ins Multiversum ----------
+    function enterMultiverse(id, skipAnimation) {
+      const u = allUsers[id];
+      applyUser(id);
+      try {
+        localStorage.setItem("marvelUser", id);
+      } catch (e) {
+        /* ignorieren */
+      }
+      Sound.ensureCtx();
+      Sound.startAmbient();
+      Sound.playPower();
+
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (skipAnimation || reduce) {
+        gate.classList.add("hidden");
+        gate.classList.remove("picking");
+        return;
+      }
+
+      document.getElementById("gate-success-name").textContent = `Willkommen zurück, ${u.name}.`;
+      success.classList.remove("hidden");
+      gate.classList.add("confirmed");
+
+      setTimeout(() => {
+        gate.classList.add("hidden");
+        gate.classList.remove("picking", "confirmed");
+        success.classList.add("hidden");
+        cardsWrap.querySelectorAll(".gate-card").forEach((card) => card.classList.remove("chosen"));
+      }, 1500);
+    }
 
     function applyUser(id) {
       const u = allUsers[id];
@@ -402,31 +526,98 @@
       badge.style.setProperty("--hero-color", u.color);
     }
 
-    function selectUser(id) {
-      localStorage.setItem("marvelUser", id);
-      applyUser(id);
-      gate.classList.add("hidden");
-      Sound.ensureCtx();
-      Sound.startAmbient();
-      Sound.playPower();
+    // ---------- Abmelden / Profil wechseln ----------
+    function showGate() {
+      closePinDialog();
+      gate.classList.remove("hidden");
     }
 
-    renderCards();
-
-    let saved = null;
-    try {
-      saved = localStorage.getItem("marvelUser");
-    } catch (e) {
-      saved = null;
-    }
-    if (saved && allUsers[saved]) {
-      applyUser(saved);
-      gate.classList.add("hidden");
+    function endSession() {
+      MarvelAuth.logout();
+      currentUser = null;
+      document.getElementById("profile-badge").classList.add("hidden");
+      try {
+        localStorage.removeItem("marvelUser");
+      } catch (e) {
+        /* ignorieren */
+      }
     }
 
     document.getElementById("profile-switch").addEventListener("click", () => {
-      closeCreateForm();
-      gate.classList.remove("hidden");
+      Sound.playClick();
+      endSession();
+      showGate();
+    });
+
+    document.getElementById("profile-logout").addEventListener("click", () => {
+      Sound.playClick();
+      endSession();
+      showGate();
+      showNotice("Abgemeldet. Bitte Profil wählen.");
+    });
+
+    // ---------- Eingabe: Tastatur, Ziffernfeld, Touch ----------
+    pinInput.addEventListener("input", () => {
+      pinInput.value = pinInput.value.replace(/\D/g, "").slice(0, MAX_PIN);
+      clearError();
+      renderDots();
+    });
+
+    pinInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitPin();
+      }
+    });
+
+    pinSubmit.addEventListener("click", submitPin);
+    document.getElementById("pin-close").addEventListener("click", () => {
+      Sound.playClick();
+      closePinDialog();
+    });
+
+    // Escape schließt den Dialog, Klick auf den Hintergrund ebenfalls.
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closePinDialog();
+      }
+    });
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) closePinDialog();
+    });
+
+    buildKeypad();
+    renderCards();
+    renderDots();
+
+    // ---------- Start: Status holen und ggf. bestehende Sitzung fortsetzen ----------
+    MarvelAuth.status().then((state) => {
+      authRequired = state.configured;
+      gate.classList.toggle("auth-on", authRequired);
+
+      if (!authRequired) {
+        // Ohne eingerichtete Anmeldung verhält sich die Seite wie bisher.
+        let saved = null;
+        try {
+          saved = localStorage.getItem("marvelUser");
+        } catch (e) {
+          saved = null;
+        }
+        if (saved && allUsers[saved]) {
+          applyUser(saved);
+          gate.classList.add("hidden");
+        }
+        return;
+      }
+
+      // Mit Anmeldung: nur eine vom Worker bestätigte Sitzung öffnet die Seite.
+      MarvelAuth.verify().then((profile) => {
+        if (profile && allUsers[profile]) {
+          applyUser(profile);
+          gate.classList.add("hidden");
+        }
+      });
     });
   }
   initUserGate();

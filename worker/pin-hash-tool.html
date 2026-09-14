@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIN-Hash erzeugen</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #0a0b12;
+    color: #e8ecf5;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .card {
+    width: min(540px, 100%);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px;
+    padding: 28px;
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .sub { color: #9aa3b5; font-size: 14px; line-height: 1.5; margin-bottom: 22px; }
+  .offline {
+    display: inline-block;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(70,220,140,0.12);
+    border: 1px solid rgba(70,220,140,0.4);
+    color: #7fe3a0;
+    margin-bottom: 18px;
+  }
+  label { display: block; font-size: 13px; margin-bottom: 6px; color: #9aa3b5; }
+  input, select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  button {
+    width: 100%;
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid rgba(120,180,255,0.5);
+    background: rgba(60,140,220,0.25);
+    color: #dbeeff;
+    cursor: pointer;
+  }
+  button:hover { background: rgba(60,140,220,0.4); }
+  .result { margin-top: 22px; display: none; }
+  .result.show { display: block; }
+  .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  code {
+    display: block;
+    word-break: break-all;
+    padding: 14px;
+    border-radius: 10px;
+    background: #05060c;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .copy { width: auto; padding: 6px 12px; font-size: 12px; }
+  .hint { font-size: 12.5px; color: #9aa3b5; margin-top: 14px; line-height: 1.6; }
+  .warn { color: #ffbe5a; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>PIN-Hash für den Cloudflare-Worker erzeugen</h1>
+    <p class="sub">
+      Hier wird aus deiner PIN ein Hash berechnet. Nur dieser Hash kommt später
+      als Cloudflare-Secret in den Worker — deine PIN selbst wird nirgends
+      gespeichert oder verschickt.
+    </p>
+
+    <div class="offline">✓ Läuft vollständig in deinem Browser — keine Internetverbindung nötig</div>
+
+    <label for="profile">Profil</label>
+    <select id="profile">
+      <option value="AHMET_PIN_HASH">Ahmet → Secret-Name: AHMET_PIN_HASH</option>
+      <option value="BURAK_PIN_HASH">Burak → Secret-Name: BURAK_PIN_HASH</option>
+    </select>
+
+    <label for="pin">Deine PIN (4 bis 8 Ziffern)</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="z.B. 4 Ziffern">
+
+    <button id="go" type="button">Hash erzeugen</button>
+
+    <div class="result" id="result">
+      <div class="label-row">
+        <label for="secretName" style="margin:0">1. Secret-Name (bei Cloudflare eintragen)</label>
+        <button class="copy" type="button" data-copy="secretName">Kopieren</button>
+      </div>
+      <code id="secretName"></code>
+
+      <div class="label-row" style="margin-top:16px">
+        <label for="hash" style="margin:0">2. Wert (bei Cloudflare als Secret einfügen)</label>
+        <button class="copy" type="button" data-copy="hash">Kopieren</button>
+      </div>
+      <code id="hash"></code>
+
+      <p class="hint">
+        <span class="warn">Wichtig:</span> Diese Seite jetzt schließen. Den Hash
+        nirgendwo in dein Projekt schreiben — er gehört ausschließlich in das
+        Cloudflare-Secret.
+      </p>
+    </div>
+
+    <p class="hint">
+      Zusätzlich brauchst du einmalig ein Secret namens <strong>AUTH_SECRET</strong>.
+      <button class="copy" id="genSecret" type="button" style="margin-top:8px">Zufälliges AUTH_SECRET erzeugen</button>
+    </p>
+    <code id="authSecret" style="display:none"></code>
+  </div>
+
+<script>
+// Erzeugt denselben Hash-Aufbau, den der Worker prüft:
+// pbkdf2$sha256$<iterationen>$<salt>$<hash>
+const ITERATIONS = 120000;
+
+function b64url(bytes) {
+  let binary = "";
+  const view = new Uint8Array(bytes);
+  for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function makeHash(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS }, keyMaterial, 256
+  );
+  return `pbkdf2$sha256$${ITERATIONS}$${b64url(salt)}$${b64url(bits)}`;
+}
+
+document.getElementById("go").addEventListener("click", async () => {
+  const pin = document.getElementById("pin").value.trim();
+  if (!/^\d{4,8}$/.test(pin)) {
+    alert("Bitte 4 bis 8 Ziffern eingeben.");
+    return;
+  }
+  document.getElementById("secretName").textContent = document.getElementById("profile").value;
+  document.getElementById("hash").textContent = await makeHash(pin);
+  document.getElementById("result").classList.add("show");
+  document.getElementById("pin").value = "";
+});
+
+document.getElementById("pin").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("go").click();
+});
+
+document.getElementById("genSecret").addEventListener("click", () => {
+  const el = document.getElementById("authSecret");
+  el.textContent = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  el.style.display = "block";
+});
+
+document.querySelectorAll(".copy[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const text = document.getElementById(btn.dataset.copy).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const old = btn.textContent;
+      btn.textContent = "Kopiert ✓";
+      setTimeout(() => (btn.textContent = old), 1500);
+    });
+  });
+});
+</script>
+</body>
+</html>
