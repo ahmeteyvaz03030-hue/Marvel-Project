@@ -371,6 +371,20 @@
   }
   initUserGate();
 
+  // Kürzel eines Filmtitels — dient überall als Fallback, wenn kein Poster geladen wird.
+  const POSTER_SKIP_WORDS = ["the", "of", "and", "a", "to", "in"];
+  function posterAbbrev(title) {
+    const words = String(title)
+      .replace(/[:*]/g, "")
+      .split(" ")
+      .filter((w) => w && POSTER_SKIP_WORDS.indexOf(w.toLowerCase()) === -1);
+    return words
+      .slice(0, 3)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
+  }
+
   // ---------- Marvel Travel (MCU-Chronologie) ----------
   function initTravel() {
     const btn = document.getElementById("travel-btn");
@@ -380,15 +394,6 @@
     const storyBtn = document.getElementById("travel-mode-story");
     const releaseBtn = document.getElementById("travel-mode-release");
     const PHASE_COLORS = ["#ff4d4d", "#5b8bff", "#ffce54", "#38d4e0", "#8a2be2", "#ff5a3c"];
-    const SKIP_WORDS = ["the", "of", "and", "a", "to", "in"];
-
-    function posterAbbrev(title) {
-      const words = title
-        .replace(/[:*]/g, "")
-        .split(" ")
-        .filter((w) => w && !SKIP_WORDS.includes(w.toLowerCase()));
-      return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
-    }
 
     function render(mode) {
       container.innerHTML = "";
@@ -418,6 +423,8 @@
               ${f.note ? `<span class="mcu-note">${f.note}</span>` : ""}
             </div>`;
           container.appendChild(item);
+          // Echtes Poster nachladen, Kürzel bleibt als Fallback stehen.
+          loadPosterInto(item.querySelector(".mcu-poster"), f.title, f.year);
           side = 1 - side;
         });
       });
@@ -726,7 +733,10 @@
 
   // ---------- Renderer / Scene / Camera ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // Auf schmalen (mobilen) Geräten wird die Pixeldichte begrenzt: die Szene mit
+  // Atmosphären und Partikeln ist füllratenintensiv, 1.5× bleibt scharf genug.
+  const maxPixelRatio = window.innerWidth < 900 ? 1.5 : 2;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   const scene = new THREE.Scene();
@@ -739,7 +749,25 @@
   let camTarget = new THREE.Vector3(0, 0, 0);
   let camPosTarget = DEFAULT_CAM_POS.clone();
   let lookTarget = new THREE.Vector3(0, 0, 0);
-  let flying = false;
+
+  // Weiche, cineastische Kamerafahrt: einmalige Tween-Bewegung mit Ease-In-Out.
+  // Danach übernimmt OrbitControls wieder die freie Steuerung.
+  let flight = null;
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function startFlight(toPos, toLook, duration) {
+    flight = {
+      fromPos: camera.position.clone(),
+      toPos: toPos.clone(),
+      fromLook: camTarget.clone(),
+      toLook: toLook.clone(),
+      elapsed: 0,
+      duration: duration || 1.5,
+    };
+  }
 
   // ---------- Freie Kamerasteuerung: Ziehen = drehen (360°), Scrollen/Pinch = zoomen ----------
   const controls = new THREE.OrbitControls(camera, canvas);
@@ -753,45 +781,122 @@
   controls.target.copy(lookTarget);
   canvas.style.touchAction = "none";
 
+  // Greift der Nutzer während einer Kamerafahrt selbst ein, bricht die Fahrt ab.
+  controls.addEventListener("start", () => {
+    flight = null;
+  });
+
   // ---------- Lights ----------
-  scene.add(new THREE.AmbientLight(0x404060, 1.1));
-  const coreLight = new THREE.PointLight(0xffb37a, 6, 300, 1.5);
+  // Bewusst dunkleres Umgebungslicht: dadurch entsteht eine deutlich sichtbare
+  // Tag/Nacht-Grenze auf den Planeten (Schattenseite) statt flacher Ausleuchtung.
+  scene.add(new THREE.AmbientLight(0x2a3050, 0.55));
+  const coreLight = new THREE.PointLight(0xffb37a, 9, 400, 1.6);
   coreLight.position.set(0, 0, 0);
   scene.add(coreLight);
-  const fillLight = new THREE.DirectionalLight(0x6a7bff, 0.6);
+  const fillLight = new THREE.DirectionalLight(0x6a7bff, 0.35);
   fillLight.position.set(-40, 30, 20);
   scene.add(fillLight);
 
-  // ---------- Starfield ----------
-  function createStarfield() {
-    const count = 4200;
+  // ---------- Starfield (zwei Ebenen + Farbvariation für Tiefe) ----------
+  function createStarLayer(count, minR, maxR, size, opacity) {
     const positions = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
+    const colors = new Float32Array(count * 3);
+    const palette = [
+      [1.0, 1.0, 1.0],
+      [0.78, 0.86, 1.0],
+      [1.0, 0.92, 0.78],
+      [0.86, 0.8, 1.0],
+    ];
     for (let i = 0; i < count; i++) {
-      const r = 220 + Math.random() * 550;
+      const r = minR + Math.random() * (maxR - minR);
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.cos(phi);
       positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-      sizes[i] = Math.random() * 1.6 + 0.3;
+      const c = palette[Math.floor(Math.random() * palette.length)];
+      const shade = 0.55 + Math.random() * 0.45;
+      colors[i * 3] = c[0] * shade;
+      colors[i * 3 + 1] = c[1] * shade;
+      colors[i * 3 + 2] = c[2] * shade;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
-    const mat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 1.1,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-    });
-    const points = new THREE.Points(geo, mat);
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    const points = new THREE.Points(
+      geo,
+      new THREE.PointsMaterial({
+        size,
+        sizeAttenuation: true,
+        vertexColors: true,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+      })
+    );
     scene.add(points);
     return points;
   }
-  const starfield = createStarfield();
+
+  const starfield = createStarLayer(4200, 220, 700, 1.1, 0.85);
+  const starfieldNear = createStarLayer(600, 110, 220, 1.9, 0.6);
+
+  // ---------- Nebel (weiche Farbschleier im Hintergrund) ----------
+  function createNebula() {
+    const group = new THREE.Group();
+    const specs = [
+      { color: "rgb(120,60,220)", size: 420, pos: [-170, 60, -230], opacity: 0.5 },
+      { color: "rgb(220,60,90)", size: 340, pos: [210, -50, -210], opacity: 0.42 },
+      { color: "rgb(50,120,230)", size: 400, pos: [40, 130, -290], opacity: 0.45 },
+    ];
+    // Große, additiv gemischte Schleier sind füllratenintensiv — auf schmalen
+    // Geräten genügt eine Schicht weniger.
+    const used = window.innerWidth < 900 ? specs.slice(0, 2) : specs;
+    used.forEach((s) => {
+      const mat = new THREE.SpriteMaterial({
+        map: makeNebulaTexture(s.color),
+        transparent: true,
+        opacity: s.opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(s.size, s.size, 1);
+      sprite.position.set(s.pos[0], s.pos[1], s.pos[2]);
+      group.add(sprite);
+    });
+    scene.add(group);
+    return group;
+  }
+  const nebula = createNebula();
+
+  // ---------- Staubpartikel (feiner Schwebstaub für Tiefe) ----------
+  function createDust() {
+    const count = 420;
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 180;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 90;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 180;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const points = new THREE.Points(
+      geo,
+      new THREE.PointsMaterial({
+        color: 0x9fb4ff,
+        size: 0.42,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    scene.add(points);
+    return points;
+  }
+  const dust = createDust();
 
   // ---------- Core "sun" ----------
   function createCore() {
@@ -815,54 +920,184 @@
   }
   scene.add(createCore());
 
-  // ---------- Procedural planet texture ----------
-  function makePlanetTexture(colorA, colorB, seedOffset) {
-    const size = 512;
-    const cvs = document.createElement("canvas");
-    cvs.width = size;
-    cvs.height = size / 2;
-    const ctx = cvs.getContext("2d");
-
-    const grad = ctx.createLinearGradient(0, 0, 0, cvs.height);
-    grad.addColorStop(0, colorA);
-    grad.addColorStop(0.5, colorB);
-    grad.addColorStop(1, colorA);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
-
-    // banding / swirl stripes
-    let seed = seedOffset * 999.7;
-    function rand() {
+  // ---------- Prozedurale Planetentexturen ----------
+  // Deterministischer Zufall je Planet, damit die Oberfläche bei jedem Laden gleich aussieht.
+  function seededRandom(seedOffset) {
+    let seed = seedOffset * 999.7 + 13;
+    return function rand() {
       seed = (seed * 9301 + 49297) % 233280;
       return seed / 233280;
+    };
+  }
+
+  function makePlanetTexture(colorA, colorB, seedOffset) {
+    const w = 1024;
+    const h = 512;
+    const cvs = document.createElement("canvas");
+    cvs.width = w;
+    cvs.height = h;
+    const ctx = cvs.getContext("2d");
+    const rand = seededRandom(seedOffset);
+
+    // Grundverlauf (Äquator wärmer, Pole kühler)
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, colorA);
+    grad.addColorStop(0.35, colorB);
+    grad.addColorStop(0.65, colorB);
+    grad.addColorStop(1, colorA);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Kontinent-/Wolkenflecken in mehreren Oktaven (fBm-artig) für Tiefe
+    for (let octave = 0; octave < 4; octave++) {
+      const count = 26 * (octave + 1);
+      const maxR = 150 / (octave + 1);
+      ctx.globalAlpha = 0.09 + octave * 0.015;
+      for (let i = 0; i < count; i++) {
+        const x = rand() * w;
+        const y = rand() * h;
+        const r = 18 + rand() * maxR;
+        const blob = ctx.createRadialGradient(x, y, 0, x, y, r);
+        const bright = rand() > 0.5;
+        blob.addColorStop(0, bright ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.8)");
+        blob.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = blob;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    ctx.globalAlpha = 0.16;
-    for (let i = 0; i < 10; i++) {
-      const y = rand() * cvs.height;
-      const h = 4 + rand() * 22;
+
+    // Breitengrad-Banding mit leichter Wellenbewegung (Gasriesen-Anmutung)
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 16; i++) {
+      const y = rand() * h;
+      const thickness = 3 + rand() * 16;
       ctx.fillStyle = rand() > 0.5 ? "#ffffff" : "#000000";
       ctx.beginPath();
-      ctx.ellipse(cvs.width / 2, y, cvs.width / 2, h, 0, 0, Math.PI * 2);
+      ctx.moveTo(0, y);
+      for (let x = 0; x <= w; x += 16) {
+        ctx.lineTo(x, y + Math.sin(x * 0.012 + i) * 6);
+      }
+      for (let x = w; x >= 0; x -= 16) {
+        ctx.lineTo(x, y + thickness + Math.sin(x * 0.012 + i) * 6);
+      }
+      ctx.closePath();
       ctx.fill();
     }
 
-    // craters / spots
-    ctx.globalAlpha = 0.22;
-    for (let i = 0; i < 40; i++) {
-      const x = rand() * cvs.width;
-      const y = rand() * cvs.height;
-      const r = 4 + rand() * 14;
-      ctx.fillStyle = rand() > 0.5 ? "#000000" : "#ffffff";
+    // Krater / Einschläge mit hellem Rand
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 70; i++) {
+      const x = rand() * w;
+      const y = h * 0.12 + rand() * h * 0.76;
+      const r = 3 + rand() * 13;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x - r * 0.18, y - r * 0.18, r * 0.82, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+
+    // Polkappen
+    ctx.globalAlpha = 1;
+    ["top", "bottom"].forEach((pole) => {
+      const capGrad = ctx.createLinearGradient(0, pole === "top" ? 0 : h, 0, pole === "top" ? h * 0.16 : h * 0.84);
+      capGrad.addColorStop(0, "rgba(232,240,255,0.78)");
+      capGrad.addColorStop(1, "rgba(232,240,255,0)");
+      ctx.fillStyle = capGrad;
+      ctx.fillRect(0, pole === "top" ? 0 : h * 0.84, w, h * 0.16);
+    });
+
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // Separate, halbtransparente Wolkenschicht, die sich eigenständig dreht.
+  function makeCloudTexture(seedOffset) {
+    const w = 1024;
+    const h = 512;
+    const cvs = document.createElement("canvas");
+    cvs.width = w;
+    cvs.height = h;
+    const ctx = cvs.getContext("2d");
+    const rand = seededRandom(seedOffset + 77);
+
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < 110; i++) {
+      const x = rand() * w;
+      const y = h * 0.1 + rand() * h * 0.8;
+      const r = 20 + rand() * 90;
+      const blob = ctx.createRadialGradient(x, y, 0, x, y, r);
+      blob.addColorStop(0, `rgba(255,255,255,${0.16 + rand() * 0.24})`);
+      blob.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = blob;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.35 + rand() * 0.3), 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
 
     const tex = new THREE.CanvasTexture(cvs);
     tex.wrapS = THREE.RepeatWrapping;
     tex.needsUpdate = true;
     return tex;
+  }
+
+  // Weicher Farbnebel als Hintergrundtiefe.
+  function makeNebulaTexture(color) {
+    const size = 512;
+    const cvs = document.createElement("canvas");
+    cvs.width = size;
+    cvs.height = size;
+    const ctx = cvs.getContext("2d");
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, color.replace("rgb", "rgba").replace(")", ",0.55)"));
+    grad.addColorStop(0.45, color.replace("rgb", "rgba").replace(")", ",0.18)"));
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // Atmosphäre: Fresnel-Rand-Leuchten statt flacher Transparenz.
+  function makeAtmosphereMaterial(accent, intensity) {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(accent) },
+        uIntensity: { value: intensity === undefined ? 1.0 : intensity },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal);
+          vViewDir = normalize(-mvPosition.xyz);
+          gl_Position = projectionMatrix * mvPosition;
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uIntensity;
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float rim = pow(1.0 - abs(dot(vNormal, vViewDir)), 2.8);
+          gl_FragColor = vec4(uColor, rim * uIntensity);
+        }`,
+      transparent: true,
+      side: THREE.BackSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
   }
 
   // ---------- Orbit ring (visual path) ----------
@@ -892,25 +1127,44 @@
     const geo = new THREE.SphereGeometry(u.radius, 48, 48);
     const mat = new THREE.MeshStandardMaterial({
       map: texture,
-      roughness: 0.75,
-      metalness: 0.15,
+      // Dieselbe Textur als Bump-Map: erzeugt Relief und damit echte
+      // Licht/Schatten-Kanten auf der Oberfläche.
+      bumpMap: texture,
+      bumpScale: u.radius * 0.06,
+      roughness: 0.82,
+      metalness: 0.12,
       emissive: new THREE.Color(u.accent),
-      emissiveIntensity: 0.12,
+      emissiveIntensity: 0.07,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData.id = u.id;
     group.add(mesh);
 
-    // atmosphere glow
-    const glowGeo = new THREE.SphereGeometry(u.radius * 1.18, 32, 32);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(u.accent),
-      transparent: true,
-      opacity: 0.18,
-      side: THREE.BackSide,
-      depthWrite: false,
-    });
-    group.add(new THREE.Mesh(glowGeo, glowMat));
+    // Eigenständig rotierende Wolkenschicht (Lambert statt Standard: deutlich
+    // günstiger und optisch für eine Wolkendecke ausreichend). Nur größere
+    // Planeten bekommen sie — bei den kleinen wäre sie kaum sichtbar, würde
+    // aber dieselbe Füllrate kosten.
+    let clouds = null;
+    if (u.radius >= 2.2) {
+      clouds = new THREE.Mesh(
+        new THREE.SphereGeometry(u.radius * 1.022, 32, 32),
+        new THREE.MeshLambertMaterial({
+          map: makeCloudTexture(idx + 1),
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+        })
+      );
+      group.add(clouds);
+    }
+
+    // Atmosphäre: eine einzelne Fresnel-Hülle erzeugt den Randglanz —
+    // günstiger als mehrere große, additiv gemischte Schalen.
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(u.radius * 1.14, 32, 32),
+      makeAtmosphereMaterial(u.accent, 1.6)
+    );
+    group.add(atmosphere);
 
     // ring for a few "special" planets
     if (u.id === "fantasticfour" || u.id === "xmen" || u.id === "doomsday" || u.id === "titan") {
@@ -934,11 +1188,14 @@
       data: u,
       group,
       mesh,
+      clouds,
       angle: u.startAngle,
       orbitRadius: u.orbitRadius,
       orbitSpeed: u.orbitSpeed,
       yOffset: u.yOffset,
       spinSpeed: 0.15 + Math.random() * 0.1,
+      hover: 0, // 0..1, steuert Vergrößerung beim Überfahren
+      tilt: new THREE.Vector2(0, 0),
     });
   });
 
@@ -1184,6 +1441,38 @@
     pointerDownAt = { x: e.clientX, y: e.clientY };
   });
 
+  // ---------- Hover & Mausbewegung ----------
+  // Normalisierte Mausposition (-1..1) für die leichte Neigung der Planeten und
+  // die Parallaxe von Nebel/Sternen.
+  const mouseNorm = new THREE.Vector2(0, 0);
+  let hoveredId = null;
+  let hoverCheckQueued = false;
+
+  canvas.addEventListener("pointermove", (e) => {
+    mouseNorm.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNorm.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    if (e.pointerType === "touch" || hoverCheckQueued) return;
+    hoverCheckQueued = true;
+    requestAnimationFrame(() => {
+      hoverCheckQueued = false;
+      pointer.set(mouseNorm.x, mouseNorm.y);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(planetObjects.map((p) => p.mesh));
+      const id = hits.length ? hits[0].object.userData.id : null;
+      if (id === hoveredId) return;
+      hoveredId = id;
+      canvas.style.cursor = id ? "pointer" : "";
+      Object.keys(labelEls).forEach((key) => labelEls[key].classList.toggle("hovered", key === id));
+    });
+  });
+
+  canvas.addEventListener("pointerleave", () => {
+    hoveredId = null;
+    canvas.style.cursor = "";
+    Object.values(labelEls).forEach((el) => el.classList.remove("hovered"));
+  });
+
   canvas.addEventListener("pointerup", (e) => {
     if (!pointerDownAt) return;
     const moved = Math.hypot(e.clientX - pointerDownAt.x, e.clientY - pointerDownAt.y);
@@ -1217,7 +1506,17 @@
     hint.style.display = "none";
     Sound.playWhoosh();
     recordVisit(id);
-    flying = true;
+
+    // Zielposition der Kamera: leicht über und vor dem Planeten, dann sanft
+    // dorthin fliegen (der aktive Planet bleibt währenddessen stehen).
+    const wp = new THREE.Vector3();
+    p.mesh.getWorldPosition(wp);
+    const dir = wp.clone().normalize();
+    const toPos = wp.clone().addScaledVector(dir, p.data.radius * 3.2 + 6);
+    toPos.y += p.data.radius * 1.4 + 2;
+    lookTarget.copy(wp);
+    camPosTarget.copy(toPos);
+    startFlight(toPos, wp, 1.6);
 
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));
     labelEls[id].classList.add("active");
@@ -1229,12 +1528,12 @@
 
   function deselect() {
     activeId = null;
-    flying = true;
     document.body.classList.remove("panel-open");
     Object.values(labelEls).forEach((el) => el.classList.remove("active"));
     panel.classList.remove("open");
     camPosTarget.copy(DEFAULT_CAM_POS);
     lookTarget.set(0, 0, 0);
+    startFlight(DEFAULT_CAM_POS, lookTarget, 1.4);
     // Der Trailer läuft bewusst im Mini-Player weiter (nicht hier stoppen).
   }
 
@@ -1520,28 +1819,352 @@
     </svg>`;
   }
 
+  const ALIGN_COLORS = {
+    Held: "#3fd0ff",
+    Bösewicht: "#ff4d5e",
+    Antiheld: "#c98bff",
+    Zivilist: "#9aa3b5",
+  };
+
+  // Zähler, damit asynchron nachgeladene Bilder eines bereits geschlossenen bzw.
+  // gewechselten Profils nicht mehr eingeblendet werden.
+  let modalToken = 0;
+
+  function escapeAttr(value) {
+    return String(value == null ? "" : value).replace(/"/g, "&quot;");
+  }
+
+  // Lädt ein Bild erst nach dem Dekodieren ein, damit nie ein halbes Bild aufblitzt.
+  function preload(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(url);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  // ---------- Backdrop im Hero (dynamisch, mit Verlauf-Fallback) ----------
+  function applyHeroBackdrop(el, character, accent) {
+    el.classList.remove("loaded");
+    el.classList.add("fallback");
+    el.style.backgroundImage = "";
+    const films = character.films || [];
+    if (!films.length || !window.TMDB || !TMDB.enabled()) return;
+
+    const token = modalToken;
+    const film = films[0];
+    TMDB.movieBackdrop(film.title, film.year)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || token !== modalToken) return;
+        el.style.backgroundImage = `url("${url}")`;
+        el.classList.remove("fallback");
+        el.classList.add("loaded");
+      })
+      .catch(() => {
+        /* Fallback-Verlauf bleibt bestehen */
+      });
+  }
+
+  // ---------- Porträt: echtes Foto, sonst generierte Grafik ----------
+  function applyPortrait(el, character, universe) {
+    el.innerHTML = characterVisualHTML(character, universe, getInitials(character.name));
+    if (character.image || !window.TMDB || !TMDB.enabled()) return;
+
+    const token = modalToken;
+    TMDB.personPhoto(character.role)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || token !== modalToken) return;
+        el.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(character.role)}">`;
+      })
+      .catch(() => {
+        /* generierte Grafik bleibt stehen */
+      });
+  }
+
+  // ---------- Filmposter (dynamisch nachgeladen, Kürzel als Fallback) ----------
+  function loadPosterInto(posterEl, title, year) {
+    if (!window.TMDB || !TMDB.enabled()) return;
+    TMDB.moviePoster(title, year)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || !posterEl.isConnected) return;
+        posterEl.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(title)}" loading="lazy">`;
+      })
+      .catch(() => {
+        /* Kürzel bleibt sichtbar */
+      });
+  }
+
+  // Ersetzt eine generierte Avatar-Grafik durch ein echtes Porträt, sobald verfügbar.
+  function loadPersonInto(el, character) {
+    if (!el || character.image || !window.TMDB || !TMDB.enabled()) {
+      if (el && character.image) el.innerHTML = `<img src="${escapeAttr(character.image)}" alt="${escapeAttr(character.name)}">`;
+      return;
+    }
+    TMDB.personPhoto(character.role)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || !el.isConnected) return;
+        el.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(character.role)}" loading="lazy">`;
+      })
+      .catch(() => {
+        /* generierte Grafik bleibt stehen */
+      });
+  }
+
+  function renderFilmGrid(container, films, accent) {
+    container.innerHTML = (films || [])
+      .map(
+        (f) => `
+        <div class="film-card" style="--accent-color:${accent}">
+          <div class="film-poster"><span class="film-abbrev">${posterAbbrev(f.title)}</span></div>
+          <div class="film-meta">
+            <span class="film-title">${f.title}</span>
+            <span class="film-year">${f.year}</span>
+            ${f.note ? `<span class="film-note">${f.note}</span>` : ""}
+          </div>
+        </div>`
+      )
+      .join("");
+
+    Array.prototype.forEach.call(container.querySelectorAll(".film-card"), (card, i) => {
+      const film = films[i];
+      if (film) loadPosterInto(card.querySelector(".film-poster"), film.title, film.year);
+    });
+  }
+
+  // ---------- Power-Stats mit Einblend-Animation ----------
+  function animateNumber(el, target, duration, delay) {
+    const start = performance.now() + (delay || 0);
+    function step(now) {
+      if (now < start) {
+        requestAnimationFrame(step);
+        return;
+      }
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function renderPowerStats(container, character) {
+    const stats = MarvelDerive.statsFor(character);
+    container.innerHTML = stats
+      .map(
+        (s) => `
+        <div class="stat-row">
+          <span class="stat-name">${s.label}</span>
+          <span class="stat-track"><span class="stat-fill" data-value="${s.value}"></span></span>
+          <span class="stat-value" data-value="${s.value}">0</span>
+        </div>`
+      )
+      .join("");
+
+    requestAnimationFrame(() => {
+      Array.prototype.forEach.call(container.querySelectorAll(".stat-fill"), (el, i) => {
+        el.style.transitionDelay = i * 70 + "ms";
+        el.style.width = el.dataset.value + "%";
+      });
+      Array.prototype.forEach.call(container.querySelectorAll(".stat-value"), (el, i) => {
+        animateNumber(el, Number(el.dataset.value), 900, i * 70);
+      });
+    });
+  }
+
+  // ---------- Beziehungs-Chips ----------
+  function aliasOf(name) {
+    const parts = String(name).split(" / ");
+    return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+  }
+
+  function renderRelationChips(container, entries, color, emptyText) {
+    if (!entries.length) {
+      container.innerHTML = `<span class="relation-empty">${emptyText}</span>`;
+      return;
+    }
+    container.innerHTML = entries
+      .map(
+        (e, i) => `
+        <button class="relation-chip" type="button" data-idx="${i}" style="--chip-color:${color || e.universe.accent}">
+          <span class="chip-dot"></span>
+          <span class="chip-text">
+            <span>${e.character.name}</span>
+            <span class="chip-sub">${e.universe.name}</span>
+          </span>
+        </button>`
+      )
+      .join("");
+
+    Array.prototype.forEach.call(container.querySelectorAll(".relation-chip"), (chip) => {
+      chip.addEventListener("click", () => {
+        const entry = entries[Number(chip.dataset.idx)];
+        if (entry) openCharacterModal(entry.character, entry.universe);
+      });
+    });
+  }
+
+  function renderStaticChips(container, items, emptyText) {
+    if (!items.length) {
+      container.innerHTML = `<span class="relation-empty">${emptyText}</span>`;
+      return;
+    }
+    container.innerHTML = items
+      .map(
+        (it) => `
+        <span class="relation-chip static" style="--chip-color:${it.accent || "var(--accent)"}">
+          <span class="chip-dot"></span>
+          <span class="chip-text">
+            <span>${it.label}</span>
+            ${it.sub ? `<span class="chip-sub">${it.sub}</span>` : ""}
+          </span>
+        </span>`
+      )
+      .join("");
+  }
+
+  // ---------- Interaktives Verbindungs-Netzwerk ----------
+  const NET_COLORS = {
+    ally: "#3fd0ff",
+    enemy: "#ff4d5e",
+    variant: "#c98bff",
+    team: "#ffce54",
+  };
+
+  function renderNetwork(container, character, universe, relations) {
+    const W = 340;
+    const H = 250;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const nodes = [];
+    relations.allies.slice(0, 4).forEach((e) => nodes.push({ type: "ally", entry: e, label: aliasOf(e.character.name) }));
+    relations.enemies.slice(0, 3).forEach((e) => nodes.push({ type: "enemy", entry: e, label: aliasOf(e.character.name) }));
+    relations.variants.slice(0, 2).forEach((e) =>
+      nodes.push({ type: "variant", entry: e, label: e.universe.name })
+    );
+    relations.teams.slice(0, 2).forEach((t) => nodes.push({ type: "team", entry: null, label: t }));
+
+    if (!nodes.length) {
+      container.innerHTML = `<div style="padding:18px"><span class="relation-empty">Keine Verbindungen hinterlegt.</span></div>`;
+      return;
+    }
+
+    nodes.forEach((n, i) => {
+      const angle = -Math.PI / 2 + (i / nodes.length) * Math.PI * 2;
+      n.x = cx + Math.cos(angle) * 126;
+      n.y = cy + Math.sin(angle) * 88;
+      n.color = NET_COLORS[n.type];
+    });
+
+    const links = nodes
+      .map((n) => `<line class="net-link" x1="${cx}" y1="${cy}" x2="${n.x}" y2="${n.y}" stroke="${n.color}"/>`)
+      .join("");
+
+    const nodeEls = nodes
+      .map((n, i) => {
+        const short = n.label.length > 18 ? n.label.slice(0, 17) + "…" : n.label;
+        return `
+        <g class="net-node${n.entry ? "" : " center"}" data-idx="${i}">
+          <circle cx="${n.x}" cy="${n.y}" r="9" fill="${n.color}" fill-opacity="0.22" stroke="${n.color}" stroke-width="1.4"/>
+          <text class="net-label" x="${n.x}" y="${n.y + 21}">${short}</text>
+        </g>`;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"
+           aria-label="Verbindungen von ${escapeAttr(character.name)}">
+        ${links}
+        ${nodeEls}
+        <g class="net-node center">
+          <circle cx="${cx}" cy="${cy}" r="17" fill="${universe.accent}" fill-opacity="0.3"
+                  stroke="${universe.accent}" stroke-width="2"/>
+          <text class="net-label center-label" x="${cx}" y="${cy + 4}">${aliasOf(character.name).slice(0, 14)}</text>
+        </g>
+      </svg>
+      <div class="net-legend">
+        <span style="color:${NET_COLORS.ally}"><i></i>Verbündete</span>
+        <span style="color:${NET_COLORS.enemy}"><i></i>Gegner</span>
+        <span style="color:${NET_COLORS.variant}"><i></i>Varianten</span>
+        <span style="color:${NET_COLORS.team}"><i></i>Teams</span>
+      </div>`;
+
+    Array.prototype.forEach.call(container.querySelectorAll(".net-node[data-idx]"), (g) => {
+      const node = nodes[Number(g.dataset.idx)];
+      if (!node || !node.entry) return;
+      g.addEventListener("click", () => openCharacterModal(node.entry.character, node.entry.universe));
+    });
+  }
+
+  // ---------- Parallax im Hero (einmalig verdrahtet) ----------
+  function initHeroParallax() {
+    const hero = document.getElementById("character-hero");
+    const bg = document.getElementById("character-hero-bg");
+    const portrait = document.getElementById("character-avatar-wrap");
+    if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    hero.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "touch") return;
+      const rect = hero.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width - 0.5;
+      const ny = (e.clientY - rect.top) / rect.height - 0.5;
+      bg.style.transform = `translate3d(${nx * -18}px, ${ny * -12}px, 0) scale(1.06)`;
+      portrait.style.transform = `translate3d(${nx * 10}px, ${ny * 7}px, 0)`;
+    });
+
+    hero.addEventListener("pointerleave", () => {
+      bg.style.transform = "";
+      portrait.style.transform = "";
+    });
+  }
+  initHeroParallax();
+
   function openCharacterModal(c, universe) {
     Sound.playClick();
+    modalToken++;
+
     const accent = universe.accent;
     const modal = document.getElementById("character-modal");
-    document.getElementById("character-card").style.setProperty("--accent-color", accent);
-    document.getElementById("character-avatar").innerHTML = characterVisualHTML(c, universe, getInitials(c.name));
-    document.getElementById("character-name").textContent = c.name;
+    const card = document.getElementById("character-card");
+    card.style.setProperty("--accent-color", accent);
+    card.scrollTop = 0;
+
+    // ---- Hero ----
+    const nameParts = String(c.name).split(" / ");
+    document.getElementById("character-name").textContent = nameParts[0].trim();
+    const aliasEl = document.getElementById("character-alias");
+    if (nameParts.length > 1) {
+      aliasEl.textContent = nameParts.slice(1).join(" / ").trim();
+      aliasEl.style.display = "";
+    } else {
+      aliasEl.textContent = "";
+      aliasEl.style.display = "none";
+    }
     document.getElementById("character-role").textContent = c.role;
 
-    const alignColors = {
-      Held: "#3fd0ff",
-      Bösewicht: "#ff4d5e",
-      Antiheld: "#c98bff",
-      Zivilist: "#9aa3b5",
-    };
+    applyPortrait(document.getElementById("character-avatar"), c, universe);
+    applyHeroBackdrop(document.getElementById("character-hero-bg"), c, accent);
+
     const alignBadge = document.getElementById("character-alignment");
     if (c.alignment) {
       alignBadge.textContent = c.alignment.toUpperCase();
-      alignBadge.style.setProperty("--badge-color", alignColors[c.alignment] || accent);
+      alignBadge.style.setProperty("--badge-color", ALIGN_COLORS[c.alignment] || accent);
       alignBadge.classList.remove("hidden");
     } else {
       alignBadge.classList.add("hidden");
+    }
+
+    const earthBadge = document.getElementById("character-earth");
+    if (universe.earth) {
+      earthBadge.textContent = universe.earth.toUpperCase();
+      earthBadge.classList.remove("hidden");
+    } else {
+      earthBadge.classList.add("hidden");
     }
 
     const debutBadge = document.getElementById("character-debut");
@@ -1556,9 +2179,6 @@
       debutBadge.classList.add("hidden");
     }
 
-    document.getElementById("character-bio").textContent =
-      c.bio || "Zu diesem Charakter liegt noch kein ausführlicher Steckbrief vor.";
-
     const favBtn = document.getElementById("character-fav");
     const syncFav = () => {
       const active = isFavorite(universe.id, c.name);
@@ -1572,19 +2192,39 @@
       syncFav();
     };
 
-    const powersWrap = document.getElementById("character-powers");
-    powersWrap.innerHTML = powerChipsHTML(c.powers, accent);
+    // ---- Inhalt ----
+    document.getElementById("character-bio").textContent =
+      c.bio || "Zu diesem Charakter liegt noch kein ausführlicher Steckbrief vor.";
 
-    const filmsList = document.getElementById("character-films");
-    filmsList.innerHTML = "";
-    (c.films || []).forEach((f) => {
-      const li = document.createElement("li");
-      li.style.setProperty("--accent-color", accent);
-      li.innerHTML = `
-        <div class="cf-top"><span>${f.title}</span><span class="cf-year">${f.year}</span></div>
-        ${f.note ? `<div class="cf-note">${f.note}</div>` : ""}`;
-      filmsList.appendChild(li);
-    });
+    renderPowerStats(document.getElementById("character-powerstats"), c);
+    document.getElementById("character-powers").innerHTML = powerChipsHTML(c.powers, accent);
+    renderFilmGrid(document.getElementById("character-films"), c.films, accent);
+
+    const relations = MarvelDerive.relationsFor(c, universe);
+    renderNetwork(document.getElementById("character-network"), c, universe, relations);
+    renderRelationChips(
+      document.getElementById("character-allies"),
+      relations.allies,
+      NET_COLORS.ally,
+      "Keine Verbündeten in diesem Universum hinterlegt."
+    );
+    renderRelationChips(
+      document.getElementById("character-enemies"),
+      relations.enemies,
+      NET_COLORS.enemy,
+      "Keine Gegner in diesem Universum hinterlegt."
+    );
+    renderStaticChips(
+      document.getElementById("character-affiliations"),
+      relations.affiliations.concat(relations.teams.map((t) => ({ label: t, sub: "", accent: NET_COLORS.team }))),
+      "Keine Zugehörigkeiten hinterlegt."
+    );
+    renderRelationChips(
+      document.getElementById("character-variants"),
+      relations.variants,
+      NET_COLORS.variant,
+      "Keine weiteren Varianten dieser Figur bekannt."
+    );
 
     modal.classList.remove("hidden");
   }
@@ -1633,6 +2273,7 @@
           <span class="crole">${c.role}</span>
         </div>
         <button class="fav-heart${favActive ? " active" : ""}" type="button" title="Favorit">${favActive ? "♥" : "♡"}</button>`;
+      loadPersonInto(li.querySelector(".avatar"), c);
       li.addEventListener("click", () => openCharacterModal(c, u));
       const heart = li.querySelector(".fav-heart");
       heart.addEventListener("click", (e) => {
@@ -1650,7 +2291,11 @@
     u.movies.forEach((m) => {
       const li = document.createElement("li");
       li.style.setProperty("--accent-color", u.accent);
-      li.innerHTML = `<span class="mtitle">${m.title}</span><span class="myear">${m.year}</span>`;
+      li.innerHTML = `
+        <span class="mposter">${posterAbbrev(m.title)}</span>
+        <span class="mtitle">${m.title}</span>
+        <span class="myear">${m.year}</span>`;
+      loadPosterInto(li.querySelector(".mposter"), m.title, m.year);
       movieList.appendChild(li);
     });
   }
@@ -1713,33 +2358,51 @@
           p.group.position.set(0, p.yOffset + Math.sin(t * 0.4) * 0.4, 0);
         }
       }
+
+      // Langsame Eigenrotation; die Wolkendecke zieht etwas schneller mit.
       p.mesh.rotation.y += p.spinSpeed * dt;
+      if (p.clouds) p.clouds.rotation.y += p.spinSpeed * dt * 1.35;
+
+      // Hover: Planet wächst weich an und sein Leuchten nimmt zu.
+      const hoverTarget = p.data.id === hoveredId ? 1 : 0;
+      p.hover += (hoverTarget - p.hover) * Math.min(1, dt * 7);
+      const scale = 1 + p.hover * 0.13;
+      p.group.scale.setScalar(scale);
+      p.mesh.material.emissiveIntensity = 0.07 + p.hover * 0.22;
+
+      // Leichte Reaktion auf die Mausbewegung (Neigung zum Zeiger hin).
+      const tiltX = mouseNorm.y * 0.13;
+      const tiltZ = -mouseNorm.x * 0.13;
+      p.tilt.x += (tiltX - p.tilt.x) * Math.min(1, dt * 2.2);
+      p.tilt.y += (tiltZ - p.tilt.y) * Math.min(1, dt * 2.2);
+      p.group.rotation.x = p.tilt.x;
+      p.group.rotation.z = p.tilt.y;
     });
 
-    // Beim Auswählen/Verlassen eines Universums fliegt die Kamera einmalig zur
-    // Zielposition; danach übernimmt OrbitControls die freie Steuerung (Drehen/Zoomen).
-    if (flying) {
-      if (activeId) {
-        const p = planetObjects.find((pl) => pl.data.id === activeId);
-        if (p) {
-          const wp = new THREE.Vector3();
-          p.mesh.getWorldPosition(wp);
-          const dir = wp.clone().normalize();
-          camPosTarget.copy(wp).addScaledVector(dir, p.data.radius * 3.2 + 6);
-          camPosTarget.y += p.data.radius * 1.4 + 2;
-          lookTarget.copy(wp);
-        }
-      }
-      camera.position.lerp(camPosTarget, 1 - Math.pow(0.001, dt));
-      camTarget.lerp(lookTarget, 1 - Math.pow(0.001, dt));
-      if (camera.position.distanceTo(camPosTarget) < 0.05 && camTarget.distanceTo(lookTarget) < 0.05) {
-        flying = false;
-      }
+    // Cineastische Kamerafahrt beim Auswählen/Verlassen eines Universums.
+    // Danach übernimmt OrbitControls wieder die freie Steuerung.
+    if (flight) {
+      flight.elapsed += dt;
+      const progress = Math.min(1, flight.elapsed / flight.duration);
+      const eased = easeInOutCubic(progress);
+      camera.position.lerpVectors(flight.fromPos, flight.toPos, eased);
+      camTarget.lerpVectors(flight.fromLook, flight.toLook, eased);
+      if (progress >= 1) flight = null;
     }
     controls.target.copy(camTarget);
     controls.update();
 
+    // Parallaxe: Hintergrundschichten wandern leicht gegen die Mausbewegung.
+    nebula.position.x += (mouseNorm.x * -14 - nebula.position.x) * Math.min(1, dt * 1.4);
+    nebula.position.y += (mouseNorm.y * -9 - nebula.position.y) * Math.min(1, dt * 1.4);
+    nebula.rotation.z += dt * 0.006;
+
     starfield.rotation.y += dt * 0.004;
+    starfieldNear.rotation.y += dt * 0.009;
+    starfieldNear.rotation.x += (mouseNorm.y * 0.05 - starfieldNear.rotation.x) * Math.min(1, dt * 1.2);
+
+    dust.rotation.y += dt * 0.02;
+    dust.position.y = Math.sin(t * 0.15) * 2;
 
     doomFigure.group.rotation.y = 0.45 + Math.sin(t * 0.15) * 0.3;
     doomFigure.group.position.y = 12 + Math.sin(t * 0.4) * 0.5;

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 
@@ -195,33 +195,84 @@
   <div id="character-modal" class="hidden">
     <div id="character-card">
       <button id="character-close" aria-label="Schließen">✕</button>
-      <div id="character-banner"></div>
-      <div id="character-avatar-wrap">
-        <div id="character-avatar"></div>
+
+      <header id="character-hero">
+        <div id="character-hero-bg"></div>
+        <div id="character-hero-scrim"></div>
+        <button id="character-fav" title="Zu Favoriten hinzufügen">♡</button>
+        <div id="character-hero-body">
+          <div id="character-avatar-wrap">
+            <div id="character-avatar"></div>
+          </div>
+          <div id="character-hero-text">
+            <div class="panel-eyebrow" id="character-eyebrow">CHARAKTER</div>
+            <h2 id="character-name">—</h2>
+            <div id="character-alias"></div>
+            <div id="character-role"></div>
+            <div id="character-stats">
+              <span id="character-alignment" class="stat-badge"></span>
+              <span id="character-earth" class="stat-badge stat-badge-outline"></span>
+              <span id="character-debut" class="stat-badge stat-badge-outline"></span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div id="character-body">
+        <section class="panel-section">
+          <h3>Biografie</h3>
+          <p id="character-bio"></p>
+        </section>
+
+        <section class="panel-section">
+          <h3>Power-Stats</h3>
+          <div id="character-powerstats"></div>
+        </section>
+
+        <section class="panel-section">
+          <h3>Kräfte &amp; Eigenschaften</h3>
+          <div id="character-powers" class="power-chips"></div>
+        </section>
+
+        <section class="panel-section">
+          <h3>Auftritte</h3>
+          <div id="character-films" class="film-grid"></div>
+        </section>
+
+        <section class="panel-section" id="section-network">
+          <h3>Verbindungen</h3>
+          <div id="character-network"></div>
+        </section>
+
+        <section class="panel-section" id="section-allies">
+          <h3>Verbündete</h3>
+          <div id="character-allies" class="relation-chips"></div>
+        </section>
+
+        <section class="panel-section" id="section-enemies">
+          <h3>Gegner</h3>
+          <div id="character-enemies" class="relation-chips"></div>
+        </section>
+
+        <section class="panel-section" id="section-affiliations">
+          <h3>Zugehörigkeiten</h3>
+          <div id="character-affiliations" class="relation-chips"></div>
+        </section>
+
+        <section class="panel-section" id="section-variants">
+          <h3>Varianten</h3>
+          <div id="character-variants" class="relation-chips"></div>
+        </section>
       </div>
-      <button id="character-fav" title="Zu Favoriten hinzufügen">♡</button>
-      <div class="panel-eyebrow" id="character-eyebrow">CHARAKTER</div>
-      <h2 id="character-name">—</h2>
-      <div id="character-role"></div>
-      <div id="character-stats">
-        <span id="character-alignment" class="stat-badge"></span>
-        <span id="character-debut" class="stat-badge stat-badge-outline"></span>
-      </div>
-      <p id="character-bio"></p>
-      <section class="panel-section">
-        <h3>Kräfte & Eigenschaften</h3>
-        <div id="character-powers" class="power-chips"></div>
-      </section>
-      <section class="panel-section">
-        <h3>Auftritte</h3>
-        <ul id="character-films" class="character-films"></ul>
-      </section>
     </div>
   </div>
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="data.js?v=26"></script>
-  <script src="script.js?v=26"></script>
+  <script src="config.js?v=27"></script>
+  <script src="tmdb.js?v=27"></script>
+  <script src="data.js?v=27"></script>
+  <script src="derive.js?v=27"></script>
+  <script src="script.js?v=27"></script>
 </body>
 </html>

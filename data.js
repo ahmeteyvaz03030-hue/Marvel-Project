@@ -201,6 +201,7 @@ const MCU_CHRONO_TIMELINE = [
 const UNIVERSES = [
   {
     id: "tobey",
+    earth: "Earth-96283",
     name: "Sam Raimi Spider-Man",
     eyebrow: "Universum · Tobey Maguire",
     colorA: "#8b0f0f",
@@ -307,6 +308,7 @@ const UNIVERSES = [
   },
   {
     id: "garfield",
+    earth: "Earth-120703",
     name: "The Amazing Spider-Man",
     eyebrow: "Universum · Andrew Garfield",
     colorA: "#a3121f",
@@ -402,6 +404,7 @@ const UNIVERSES = [
   },
   {
     id: "holland",
+    earth: "Earth-199999",
     name: "MCU Spider-Man",
     eyebrow: "Universum · Tom Holland",
     colorA: "#b3231d",
@@ -529,6 +532,7 @@ const UNIVERSES = [
   },
   {
     id: "avengers",
+    earth: "Earth-199999",
     name: "Avengers — Das Kernteam",
     eyebrow: "Universum · Die Infinity Saga",
     colorA: "#1b2a6b",
@@ -794,6 +798,7 @@ const UNIVERSES = [
   },
   {
     id: "fantasticfour",
+    earth: "Earth-828",
     name: "Fantastic Four",
     eyebrow: "Universum · Erste Familie Marvels",
     colorA: "#1b3a8a",
@@ -867,6 +872,7 @@ const UNIVERSES = [
   },
   {
     id: "thunderbolts",
+    earth: "Earth-199999",
     name: "Thunderbolts",
     eyebrow: "Universum · Die neuen Avengers",
     colorA: "#3b1e5c",
@@ -966,6 +972,7 @@ const UNIVERSES = [
   },
   {
     id: "xmen",
+    earth: "Earth-10005",
     name: "X-Men",
     eyebrow: "Universum · Mutanten",
     colorA: "#132a63",
@@ -1113,6 +1120,7 @@ const UNIVERSES = [
   },
   {
     id: "doomsday",
+    earth: "Multiversum",
     name: "Avengers: Doomsday",
     eyebrow: "Universum · Multiversum-Konvergenz",
     colorA: "#0d3320",
@@ -1223,6 +1231,7 @@ const UNIVERSES = [
   },
   {
     id: "titan",
+    earth: "Earth-199999",
     name: "Titan — Thanos' Reich",
     eyebrow: "Universum · Das tote Homeworld",
     colorA: "#4a3a2c",
