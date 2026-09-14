@@ -25,5 +25,5 @@ window.MARVEL_CONFIG = {
 
   // Auf true setzen, um die Bildsuche Schritt für Schritt in der Browser-Konsole
   // mitzuschreiben (Film-ID, gefundene Besetzung, profile_path, fertige Bild-URL).
-  debugImages: true,
+  debugImages: falsse,
 };
