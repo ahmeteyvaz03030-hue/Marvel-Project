@@ -1,19 +1,21 @@
 // ---------------------------------------------------------------------------
 // Konfiguration für dynamisch geladene Bilder (Filmposter, Backdrops, Porträts)
 // ---------------------------------------------------------------------------
-// Die Seite lädt Bilder NICHT fest im Code hinterlegt, sondern zur Laufzeit über
-// die kostenlose TMDB-API (https://www.themoviedb.org).
+// WICHTIG: Hier steht bewusst KEIN API-Key mehr.
 //
-// So aktivierst du echte Bilder:
-//   1. Kostenloses Konto auf https://www.themoviedb.org anlegen
-//   2. Unter Einstellungen → API einen (kostenlosen) API-Key beantragen
-//   3. Den Key unten bei tmdbApiKey eintragen und die Datei speichern/pushen
+// Diese Datei wird von GitHub Pages unverändert an jeden Besucher ausgeliefert.
+// Alles, was hier drinsteht, ist öffentlich lesbar — ein API-Key gehört daher
+// niemals in diese Datei (auch nicht über ein GitHub-Secret beim Build, weil
+// der Wert dabei ebenfalls in die ausgelieferte Datei geschrieben würde).
 //
-// Ohne Key funktioniert die Seite unverändert weiter: überall, wo ein Bild
-// fehlt, greift automatisch die generierte Grafik als Fallback.
+// Der Key wird stattdessen serverseitig gehalten. Die Seite spricht dann nicht
+// mehr direkt mit api.themoviedb.org, sondern mit einem kleinen Proxy, der den
+// Key kennt und die Anfragen weiterreicht.
 window.MARVEL_CONFIG = {
-  // TMDB API-Key (v3). Leer lassen = Bilder aus, generierte Grafiken werden genutzt.
-  tmdbApiKey: "",
+  // Adresse des TMDB-Proxys (ohne abschließenden Schrägstrich), z.B.
+  // "https://marvel-tmdb.<name>.workers.dev". Solange der Wert leer ist, werden
+  // keine TMDB-Anfragen gestellt und überall greifen die generierten Grafiken.
+  tmdbProxyUrl: "",
 
   // Sprache für Titel/Bilder der TMDB-Suche.
   tmdbLanguage: "de-DE",

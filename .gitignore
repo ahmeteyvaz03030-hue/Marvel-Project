@@ -1,1 +1,6 @@
 node_modules/
+
+# Lokale Konfiguration mit Zugangsdaten — darf nie ins Repository
+config.local.js
+.env
+.env.*
