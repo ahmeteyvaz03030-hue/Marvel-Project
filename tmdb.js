@@ -2,23 +2,28 @@
 // Bild-Service: lädt Filmposter, Backdrops und Personen-Porträts dynamisch über
 // die TMDB-API. Keine Bild-URL ist fest im Code hinterlegt.
 //
-// Verhalten ohne API-Key (oder bei Netzwerkfehlern): jede Anfrage liefert null,
-// die Oberfläche fällt automatisch auf ihre generierten Grafiken zurück.
+// Wichtig: Der Browser spricht NIE direkt mit api.themoviedb.org und kennt
+// keinen API-Key. Alle Datenabfragen laufen über den Proxy aus
+// MARVEL_CONFIG.tmdbProxyUrl (siehe worker/tmdb-proxy.js), der den Key
+// serverseitig hält. Nur die Bilddateien von image.tmdb.org werden direkt
+// geladen — die brauchen keinen Key.
+//
+// Ohne konfigurierten Proxy (oder bei Netzwerkfehlern) liefert jede Anfrage
+// null und die Oberfläche fällt auf ihre generierten Grafiken zurück.
 // ---------------------------------------------------------------------------
 window.TMDB = (function () {
   "use strict";
 
   const CFG = window.MARVEL_CONFIG || {};
-  const KEY = (CFG.tmdbApiKey || "").trim();
+  const PROXY = (CFG.tmdbProxyUrl || "").trim().replace(/\/+$/, "");
   const LANG = CFG.tmdbLanguage || "de-DE";
   const TTL_MS = (CFG.imageCacheHours || 168) * 3600 * 1000;
-  const API = "https://api.themoviedb.org/3";
   const IMG = "https://image.tmdb.org/t/p";
   const CACHE_PREFIX = "tmdbCache:";
 
-  // Läuft nur, wenn ein Key konfiguriert ist.
+  // Läuft nur, wenn die Proxy-Adresse konfiguriert ist.
   function enabled() {
-    return KEY.length > 0;
+    return PROXY.length > 0;
   }
 
   // ---------- Cache (localStorage, mit Ablaufzeit; auch negative Treffer) ----------
@@ -50,8 +55,11 @@ window.TMDB = (function () {
   const inFlight = new Map();
 
   function request(pathname, params) {
-    const url = new URL(API + pathname);
-    url.searchParams.set("api_key", KEY);
+    if (!enabled()) return Promise.resolve(null);
+
+    // Die Anfrage geht an den Proxy, nicht an TMDB. Es wird bewusst kein
+    // api_key gesetzt — den kennt nur der Worker.
+    const url = new URL(PROXY + pathname);
     url.searchParams.set("language", LANG);
     Object.entries(params || {}).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
