@@ -112,6 +112,81 @@ window.TMDB = (function () {
     return movieImages(title, year).then((m) => (m && m.backdrop) || null);
   }
 
+  // Zusatzdaten eines Films: Kurzbeschreibung, Kinostart und Status.
+  function movieDetails(title, year) {
+    const clean = normalizeTitle(title);
+    if (!enabled() || !clean) return Promise.resolve(null);
+
+    const key = `details:${clean.toLowerCase()}:${year || ""}`;
+    const cached = cacheGet(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+
+    return movieImages(title, year)
+      .then((m) => (m && m.tmdbId ? request(`/movie/${m.tmdbId}`, {}) : null))
+      .then((data) => {
+        const value = data
+          ? {
+              overview: data.overview || "",
+              releaseDate: data.release_date || "",
+              status: data.status || "",
+              runtime: data.runtime || 0,
+              tagline: data.tagline || "",
+            }
+          : null;
+        cacheSet(key, value);
+        return value;
+      });
+  }
+
+  // Film-Logo (Schriftzug mit transparentem Hintergrund), falls hinterlegt.
+  function movieLogo(title, year) {
+    const clean = normalizeTitle(title);
+    if (!enabled() || !clean) return Promise.resolve(null);
+
+    const key = `logo:${clean.toLowerCase()}:${year || ""}`;
+    const cached = cacheGet(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+
+    return movieImages(title, year)
+      .then((m) =>
+        m && m.tmdbId
+          ? request(`/movie/${m.tmdbId}/images`, { include_image_language: "de,en,null" })
+          : null
+      )
+      .then((data) => {
+        const logos = data && Array.isArray(data.logos) ? data.logos : [];
+        // Bevorzugt PNG (transparenter Hintergrund) statt SVG, das nicht überall lädt.
+        const logo = logos.find((l) => l.file_path && /\.png$/i.test(l.file_path)) || logos[0];
+        const value = logo ? imageUrl(logo.file_path, "w500") : null;
+        cacheSet(key, value);
+        return value;
+      });
+  }
+
+  // ---------- Serien ----------
+  function seriesPoster(title, year) {
+    const clean = normalizeTitle(title);
+    if (!enabled() || !clean) return Promise.resolve(null);
+
+    const key = `tv:${clean.toLowerCase()}`;
+    const cached = cacheGet(key);
+    if (cached !== undefined) return Promise.resolve(cached);
+
+    return request("/search/tv", { query: clean, first_air_date_year: year }).then((data) => {
+      const hit = data && Array.isArray(data.results) && data.results.length ? data.results[0] : null;
+      const value = hit ? imageUrl(hit.poster_path, "w342") : null;
+      cacheSet(key, value);
+      return value;
+    });
+  }
+
+  // ---------- YouTube-Vorschaubild ----------
+  // Kein API-Aufruf: YouTube liefert zu jeder Video-ID ein Standbild unter einer
+  // festen Adresse. Funktioniert daher auch ohne TMDB-Key.
+  function youtubeThumb(videoId) {
+    return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
+  }
+
   // ---------- Personen (Schauspieler-Porträts) ----------
   // Der Rollen-Text der Seite enthält teils Zusätze wie "Robert Downey Jr." mit
   // Kommentaren — hier wird nur der reine Name verwendet.
@@ -144,6 +219,10 @@ window.TMDB = (function () {
     moviePoster,
     movieBackdrop,
     movieImages,
+    movieDetails,
+    movieLogo,
+    seriesPoster,
     personPhoto,
+    youtubeThumb,
   };
 })();

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -87,6 +87,7 @@
     <button id="favorites-btn">⭐ <span>FAVORITEN</span></button>
     <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
     <button id="theories-btn">🔮 <span>THEORIEN</span></button>
+    <button id="map-btn">🌌 <span>MULTIVERSE MAP</span></button>
   </div>
 
   <div id="travel-overlay" class="hidden">
@@ -160,8 +161,22 @@
   <aside id="panel">
     <button id="panel-close" aria-label="Schließen">✕</button>
     <div id="panel-inner">
-      <div class="panel-eyebrow" id="panel-eyebrow">UNIVERSUM</div>
-      <h2 id="panel-title">—</h2>
+      <div id="panel-hero">
+        <div id="panel-hero-bg"></div>
+        <div id="panel-hero-scrim"></div>
+        <div id="panel-hero-content">
+          <div class="panel-eyebrow" id="panel-eyebrow">UNIVERSUM</div>
+          <img id="panel-logo" alt="" hidden>
+          <h2 id="panel-title">—</h2>
+        </div>
+      </div>
+
+      <div id="panel-meta">
+        <div class="pmeta"><span>Veröffentlichung</span><strong id="panel-release">—</strong></div>
+        <div class="pmeta"><span>Status</span><strong id="panel-status">—</strong></div>
+        <div class="pmeta"><span>Timeline</span><strong id="panel-timeline">—</strong></div>
+      </div>
+
       <p id="panel-desc"></p>
 
       <div id="countdown-block" class="hidden">
@@ -177,7 +192,11 @@
 
       <div id="trailer-block" class="hidden">
         <div class="countdown-label">TRAILER</div>
-        <button id="trailer-reopen-btn">🎬 Trailer im Mini-Player abspielen</button>
+        <button id="trailer-reopen-btn" title="Trailer im Mini-Player abspielen">
+          <span id="trailer-thumb"></span>
+          <span class="trailer-play">▶</span>
+          <span class="trailer-label">Trailer abspielen</span>
+        </button>
       </div>
 
       <section class="panel-section">
@@ -189,8 +208,92 @@
         <h3>Filme</h3>
         <ol id="panel-movies" class="movie-list"></ol>
       </section>
+
+      <section class="panel-section" id="panel-related-films-section">
+        <h3>Verwandte Filme</h3>
+        <div id="panel-related-films" class="film-grid"></div>
+      </section>
+
+      <section class="panel-section" id="panel-related-universes-section">
+        <h3>Verwandte Universen</h3>
+        <div id="panel-related-universes" class="relation-chips"></div>
+      </section>
     </div>
   </aside>
+
+  <div id="film-modal" class="hidden">
+    <div id="film-card">
+      <button id="film-close" aria-label="Schließen">✕</button>
+      <header id="film-hero">
+        <div id="film-hero-bg"></div>
+        <div id="film-hero-scrim"></div>
+        <div id="film-hero-body">
+          <div id="film-poster"></div>
+          <div id="film-hero-text">
+            <div class="panel-eyebrow" id="film-phase">FILM</div>
+            <h2 id="film-title">—</h2>
+            <div id="film-badges">
+              <span id="film-year" class="stat-badge stat-badge-outline"></span>
+              <span id="film-era" class="stat-badge stat-badge-outline"></span>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div id="film-body">
+        <section class="panel-section">
+          <h3>Worum geht es?</h3>
+          <p id="film-desc"></p>
+        </section>
+        <section class="panel-section" id="film-universes-section">
+          <h3>Universen</h3>
+          <div id="film-universes" class="relation-chips"></div>
+        </section>
+        <section class="panel-section" id="film-characters-section">
+          <h3>Figuren in diesem Film</h3>
+          <div id="film-characters" class="relation-chips"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="map-overlay" class="hidden">
+    <div id="map-panel">
+      <button id="map-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">MULTIVERSUM</div>
+      <h2>Multiverse Map</h2>
+      <p class="travel-sub">Die leuchtenden Linien zeigen, welche Universen sich Figuren teilen. Klicke ein Universum an, um direkt zu seinem Planeten zu fliegen.</p>
+      <div id="map-canvas"></div>
+      <div id="map-detail"></div>
+    </div>
+  </div>
+
+  <button id="jarvis-btn" title="J.A.R.V.I.S. öffnen" aria-label="J.A.R.V.I.S. öffnen">
+    <span class="jarvis-ring"></span>
+    <span class="jarvis-core"></span>
+  </button>
+
+  <div id="jarvis-panel" class="hidden">
+    <div id="jarvis-head">
+      <span class="jarvis-dot"></span>
+      <span class="jarvis-title">J.A.R.V.I.S.</span>
+      <span class="jarvis-status">ONLINE</span>
+      <button id="jarvis-close" aria-label="Schließen">✕</button>
+    </div>
+    <div id="jarvis-log" aria-live="polite"></div>
+    <form id="jarvis-form" autocomplete="off">
+      <input id="jarvis-input" type="text" placeholder="Befehl eingeben…" autocomplete="off">
+      <button type="submit" aria-label="Senden">▸</button>
+    </form>
+  </div>
+
+  <div id="secret-overlay" class="hidden">
+    <div id="secret-content">
+      <div id="secret-icon">⧗</div>
+      <h2 id="secret-title">—</h2>
+      <p id="secret-text"></p>
+      <button id="secret-close">Schließen</button>
+    </div>
+  </div>
 
   <div id="character-modal" class="hidden">
     <div id="character-card">
@@ -269,10 +372,10 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="config.js?v=27"></script>
-  <script src="tmdb.js?v=27"></script>
-  <script src="data.js?v=27"></script>
-  <script src="derive.js?v=27"></script>
-  <script src="script.js?v=27"></script>
+  <script src="config.js?v=28"></script>
+  <script src="tmdb.js?v=28"></script>
+  <script src="data.js?v=28"></script>
+  <script src="derive.js?v=28"></script>
+  <script src="script.js?v=28"></script>
 </body>
 </html>

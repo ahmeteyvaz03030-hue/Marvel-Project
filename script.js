@@ -157,6 +157,65 @@
     }, duration || 3200);
   }
 
+  // ---------- Overlay-Übergänge & Render-Pause ----------
+  // Alle Vollbild-Ebenen laufen über dieselben Helfer: sie starten die kurze
+  // Einblend-Animation neu und pausieren die 3D-Szene, solange etwas davor liegt
+  // (spart Rechenzeit, wenn die Planeten ohnehin verdeckt sind).
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const BLOCKING_OVERLAY_IDS = [
+    "travel-overlay",
+    "favorites-overlay",
+    "compare-overlay",
+    "theories-overlay",
+    "character-modal",
+    "film-modal",
+    "map-overlay",
+    "snap-overlay",
+    "secret-overlay",
+  ];
+
+  let renderPaused = false;
+
+  function updateRenderPause() {
+    const covered = BLOCKING_OVERLAY_IDS.some((id) => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains("hidden");
+    });
+    renderPaused = covered || document.hidden;
+  }
+
+  document.addEventListener("visibilitychange", updateRenderPause);
+
+  function openOverlay(el) {
+    if (!el) return;
+    el.classList.remove("hidden");
+    // Einblend-Animation des Inhalts neu starten
+    const inner = el.firstElementChild;
+    if (inner && !reduceMotion) {
+      inner.style.animation = "none";
+      void inner.offsetWidth;
+      inner.style.animation = "";
+    }
+    updateRenderPause();
+  }
+
+  function closeOverlay(el) {
+    if (!el) return;
+    el.classList.add("hidden");
+    updateRenderPause();
+  }
+
+  // Kurzer Warp-Effekt beim Sprung zu einem Planeten (nur transform/opacity).
+  function playWarpFlash(color) {
+    if (reduceMotion) return;
+    const flash = document.createElement("div");
+    flash.className = "warp-flash";
+    flash.style.setProperty("--warp-color", color || "#ffffff");
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+  }
+
   // ---------- Suchindex (gemeinsam für Suche, Favoriten & Vergleich) ----------
   function buildSearchIndex() {
     const index = [];
@@ -174,6 +233,7 @@
         index.push({
           type: "movie",
           label: m.title,
+          year: m.year,
           sub: `${m.year} · ${u.name}`,
           universe: u,
         });
@@ -390,45 +450,121 @@
     const btn = document.getElementById("travel-btn");
     const overlay = document.getElementById("travel-overlay");
     const closeBtn = document.getElementById("travel-close");
+    const panel = document.getElementById("travel-panel");
     const container = document.getElementById("travel-timeline");
     const storyBtn = document.getElementById("travel-mode-story");
     const releaseBtn = document.getElementById("travel-mode-release");
     const PHASE_COLORS = ["#ff4d4d", "#5b8bff", "#ffce54", "#38d4e0", "#8a2be2", "#ff5a3c"];
 
+    let progressLine = null;
+    let revealObserver = null;
+
+    // Die Linie zwischen den Filmen wird beim Scrollen Stück für Stück beleuchtet.
+    function updateLineProgress() {
+      if (!progressLine) return;
+      const max = panel.scrollHeight - panel.clientHeight;
+      const ratio = max > 0 ? Math.min(1, Math.max(0, panel.scrollTop / max)) : 1;
+      progressLine.style.transform = `scaleY(${ratio})`;
+    }
+
     function render(mode) {
+      if (revealObserver) revealObserver.disconnect();
       container.innerHTML = "";
+      // Grid-Layout der Zeitleiste (Mittellinie + abwechselnd links/rechts)
+      container.className = "mcu-timeline";
+
       const line = document.createElement("div");
       line.className = "mcu-line";
       container.appendChild(line);
 
+      progressLine = document.createElement("div");
+      progressLine.className = "mcu-line-progress";
+      container.appendChild(progressLine);
+
       const groups = mode === "release" ? MCU_TIMELINE : MCU_CHRONO_TIMELINE;
       let side = 0;
       groups.forEach((group, groupIdx) => {
+        const color = PHASE_COLORS[groupIdx % PHASE_COLORS.length];
+
         const marker = document.createElement("div");
-        marker.className = "mcu-phase-marker";
+        marker.className = "mcu-phase-marker reveal";
+        marker.style.setProperty("--item-color", color);
         marker.textContent = mode === "release" ? group.phase : `${group.era} · ${group.years}`;
         container.appendChild(marker);
 
-        const color = PHASE_COLORS[groupIdx % PHASE_COLORS.length];
         group.films.forEach((f) => {
+          const info = MarvelDerive.filmInfo(f.title);
+          const phase = info ? info.phase : "";
+          const desc = info ? info.desc : "";
+
           const item = document.createElement("div");
-          item.className = "mcu-item " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
+          item.className =
+            "mcu-item reveal " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
           item.style.setProperty("--item-color", color);
           item.innerHTML = `
             <span class="mcu-dot"></span>
             <div class="mcu-poster">${posterAbbrev(f.title)}</div>
             <div class="mcu-card">
-              <span class="mcu-year">${f.year}</span>
+              <span class="mcu-year">${f.year}${phase && mode !== "release" ? ` · ${phase}` : ""}</span>
               <span class="mcu-title">${f.title}</span>
+              ${desc ? `<span class="mcu-desc">${desc}</span>` : ""}
               ${f.note ? `<span class="mcu-note">${f.note}</span>` : ""}
             </div>`;
           container.appendChild(item);
+
           // Echtes Poster nachladen, Kürzel bleibt als Fallback stehen.
           loadPosterInto(item.querySelector(".mcu-poster"), f.title, f.year);
+
+          // Beim Überfahren erscheint das Szenenbild des Films dezent im Hintergrund.
+          let backdropLoaded = false;
+          item.addEventListener("pointerenter", () => {
+            if (backdropLoaded || !window.TMDB || !TMDB.enabled()) return;
+            backdropLoaded = true;
+            TMDB.movieBackdrop(f.title, f.year)
+              .then((url) => (url ? preload(url) : null))
+              .then((url) => {
+                if (url) item.style.setProperty("--item-backdrop", `url("${url}")`);
+              })
+              .catch(() => {});
+          });
+
+          item.addEventListener("click", () => openFilmModal(f.title, f.year));
           side = 1 - side;
         });
       });
+
+      // Kapitel und Filme cineastisch einblenden, sobald sie in Sicht kommen.
+      if ("IntersectionObserver" in window && !reduceMotion) {
+        revealObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("visible");
+                revealObserver.unobserve(entry.target);
+              }
+            });
+          },
+          { root: panel, rootMargin: "0px 0px -8% 0px", threshold: 0.12 }
+        );
+        Array.prototype.forEach.call(container.querySelectorAll(".reveal"), (el) => revealObserver.observe(el));
+      } else {
+        Array.prototype.forEach.call(container.querySelectorAll(".reveal"), (el) => el.classList.add("visible"));
+      }
+
+      panel.scrollTop = 0;
+      requestAnimationFrame(updateLineProgress);
     }
+
+    // Scroll-Fortschritt gebündelt pro Frame auswerten (kein Layout-Thrashing).
+    let scrollQueued = false;
+    panel.addEventListener("scroll", () => {
+      if (scrollQueued) return;
+      scrollQueued = true;
+      requestAnimationFrame(() => {
+        scrollQueued = false;
+        updateLineProgress();
+      });
+    });
 
     render("story");
 
@@ -446,12 +582,465 @@
     });
 
     btn.addEventListener("click", () => {
-      overlay.classList.remove("hidden");
+      openOverlay(overlay);
+      requestAnimationFrame(updateLineProgress);
       Sound.playClick();
     });
-    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
   }
   initTravel();
+
+  // ---------- J.A.R.V.I.S. (Befehls-Assistent) ----------
+  // Die Befehle werden lokal ausgewertet. Die Struktur ist bewusst als Liste von
+  // Mustern + Aktionen aufgebaut: eine echte KI-Schnittstelle kann später einfach
+  // eingehängt werden, indem sie denselben Aktionen einen Treffer zurückgibt
+  // (siehe JARVIS.runCommand weiter unten).
+  const JARVIS = (function () {
+    const log = () => document.getElementById("jarvis-log");
+
+    function say(text, who) {
+      const entry = document.createElement("div");
+      entry.className = "jarvis-msg " + (who || "jarvis");
+      entry.innerHTML = text;
+      log().appendChild(entry);
+      log().scrollTop = log().scrollHeight;
+    }
+
+    function findUniverse(query) {
+      const q = query.toLowerCase();
+      return (
+        UNIVERSES.find((u) => u.name.toLowerCase().indexOf(q) !== -1) ||
+        UNIVERSES.find((u) => u.id.toLowerCase().indexOf(q) !== -1) ||
+        UNIVERSES.find((u) => u.eyebrow.toLowerCase().indexOf(q) !== -1)
+      );
+    }
+
+    function findCharacters(query) {
+      const q = query.toLowerCase();
+      const hits = [];
+      UNIVERSES.forEach((u) => {
+        u.characters.forEach((c) => {
+          if (c.name.toLowerCase().indexOf(q) !== -1) hits.push({ character: c, universe: u });
+        });
+      });
+      return hits;
+    }
+
+    // Jede Regel: Muster + Aktion. Rückgabe = Antworttext.
+    const COMMANDS = [
+      {
+        name: "variants",
+        test: /(varianten|versionen)/i,
+        run: (m, input) => {
+          // Beide Satzstellungen abdecken: "Varianten von X" und "alle X Varianten"
+          const after = input.match(/(?:varianten|versionen)\s+(?:von\s+)?(.+)/i);
+          const before = input.match(/(?:alle\s+)?([^,.!?]+?)\s+(?:varianten|versionen)/i);
+          let query = (after && after[1]) || (before && before[1]) || "";
+
+          // Füllwörter am Anfang entfernen ("zeige mir alle ...")
+          let prev;
+          do {
+            prev = query;
+            query = query.replace(/^(?:zeig(?:e)?|mir|alle|die|der|das|den|von|bitte)\s+/i, "");
+          } while (query !== prev);
+          query = query.trim().replace(/[?.!]+$/, "");
+
+          if (!query) return "Zu welcher Figur möchtest du die Varianten sehen?";
+          const hits = findCharacters(query);
+          if (!hits.length) return `Keine Figur gefunden, die zu „${query}“ passt.`;
+
+          const base = MarvelDerive.baseName(hits[0].character.name);
+          const variants = hits.filter((h) => MarvelDerive.baseName(h.character.name) === base);
+          openCharacterModal(variants[0].character, variants[0].universe);
+          setTimeout(() => {
+            const section = document.getElementById("section-variants");
+            if (section) section.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+          }, 400);
+          return `${variants.length} Fassung${variants.length === 1 ? "" : "en"} von <strong>${
+            variants[0].character.name
+          }</strong> gefunden — Profil mit Varianten geöffnet.`;
+        },
+      },
+      {
+        name: "openUniverse",
+        test: /(öffne|zeige|zeig mir|geh(e)? zu)\s+(das\s+)?(.+?)(-universum|universum|planet)?$/i,
+        run: (m) => {
+          const query = m[4].trim().replace(/[?.!]+$/, "");
+          const universe = findUniverse(query);
+          if (universe) {
+            closeJarvisSoft();
+            selectUniverse(universe.id);
+            return `Kurs auf <strong>${universe.name}</strong> gesetzt.`;
+          }
+          const hits = findCharacters(query);
+          if (hits.length) {
+            openCharacterModal(hits[0].character, hits[0].universe);
+            return `Profil von <strong>${hits[0].character.name}</strong> geöffnet.`;
+          }
+          return `Ich finde weder ein Universum noch eine Figur namens „${query}“.`;
+        },
+      },
+      {
+        name: "compare",
+        test: /vergleiche?\s+(.+?)\s+(?:und|mit|gegen|vs\.?)\s+(.+)/i,
+        run: (m) => {
+          const a = findCharacters(m[1].trim());
+          const b = findCharacters(m[2].trim().replace(/[?.!]+$/, ""));
+          if (!a.length || !b.length) return "Mindestens eine der beiden Figuren kenne ich nicht.";
+          openCompareWith(a[0], b[0]);
+          return `Duell-Analyse: <strong>${a[0].character.name}</strong> gegen <strong>${b[0].character.name}</strong>.`;
+        },
+      },
+      {
+        name: "after",
+        test: /(nach|ab)\s+(.+?)\??$/i,
+        run: (m) => {
+          const query = m[2].trim().toLowerCase();
+          const all = [];
+          MCU_CHRONO_TIMELINE.forEach((era) => era.films.forEach((f) => all.push(f)));
+          const idx = all.findIndex((f) => f.title.toLowerCase().indexOf(query) !== -1);
+          if (idx === -1) return `Den Film „${m[2].trim()}“ finde ich nicht in der Zeitleiste.`;
+          const next = all.slice(idx + 1, idx + 5);
+          if (!next.length) return `<strong>${all[idx].title}</strong> ist der letzte Eintrag der Zeitleiste.`;
+          return (
+            `Nach <strong>${all[idx].title}</strong> folgt:<br>` +
+            next.map((f) => `• ${f.title} (${f.year})`).join("<br>")
+          );
+        },
+      },
+      {
+        name: "timeline",
+        test: /(timeline|zeitleiste|marvel travel|chronologie)/i,
+        run: () => {
+          closeJarvisSoft();
+          document.getElementById("travel-btn").click();
+          return "Zeitleiste geöffnet.";
+        },
+      },
+      {
+        name: "map",
+        test: /(multiverse map|karte|verbindungen)/i,
+        run: () => {
+          closeJarvisSoft();
+          document.getElementById("map-btn").click();
+          return "Multiverse Map geöffnet.";
+        },
+      },
+      {
+        name: "favorites",
+        test: /(favoriten|lieblings)/i,
+        run: () => {
+          closeJarvisSoft();
+          document.getElementById("favorites-btn").click();
+          return "Deine Favoriten.";
+        },
+      },
+      {
+        name: "theories",
+        test: /(theorie|theorien)/i,
+        run: () => {
+          closeJarvisSoft();
+          document.getElementById("theories-btn").click();
+          return "Theorien-Board geöffnet.";
+        },
+      },
+      {
+        name: "countdown",
+        test: /(countdown|doomsday|wann kommt)/i,
+        run: () => {
+          closeJarvisSoft();
+          selectUniverse("doomsday");
+          return "Avengers: Doomsday — Countdown läuft.";
+        },
+      },
+      {
+        name: "help",
+        test: /(hilfe|help|was kannst du|befehle)/i,
+        run: () =>
+          'Ich kann unter anderem:<br>' +
+          '• „Zeige mir alle Spider-Man Varianten.“<br>' +
+          '• „Öffne das Raimi-Universum.“<br>' +
+          '• „Welche Filme kommen nach Endgame?“<br>' +
+          '• „Vergleiche Thor und Hulk.“<br>' +
+          '• „Öffne die Zeitleiste“ / „Multiverse Map“ / „Favoriten“',
+      },
+    ];
+
+    // Einstiegspunkt: hier könnte später eine KI-API andocken, die denselben
+    // Befehlsnamen samt Parametern zurückgibt.
+    function runCommand(text) {
+      const input = String(text || "").trim();
+      if (!input) return null;
+      for (let i = 0; i < COMMANDS.length; i++) {
+        const match = input.match(COMMANDS[i].test);
+        if (match) {
+          try {
+            return COMMANDS[i].run(match, input);
+          } catch (e) {
+            return "Dabei ist etwas schiefgelaufen.";
+          }
+        }
+      }
+      return null;
+    }
+
+    return { say, runCommand, commands: COMMANDS };
+  })();
+
+  function closeJarvis() {
+    closeOverlay(document.getElementById("jarvis-panel"));
+    document.getElementById("jarvis-panel").classList.add("hidden");
+    document.getElementById("jarvis-btn").classList.remove("active");
+  }
+
+  // Schließt das Fenster, ohne die Render-Pause zu beeinflussen (JARVIS ist klein
+  // und verdeckt die Szene nicht).
+  function closeJarvisSoft() {
+    document.getElementById("jarvis-panel").classList.add("hidden");
+    document.getElementById("jarvis-btn").classList.remove("active");
+  }
+
+  function initJarvis() {
+    const btn = document.getElementById("jarvis-btn");
+    const panelEl = document.getElementById("jarvis-panel");
+    const closeBtn = document.getElementById("jarvis-close");
+    const form = document.getElementById("jarvis-form");
+    const input = document.getElementById("jarvis-input");
+    let greeted = false;
+
+    btn.addEventListener("click", () => {
+      const nowOpen = panelEl.classList.contains("hidden");
+      panelEl.classList.toggle("hidden", !nowOpen);
+      btn.classList.toggle("active", nowOpen);
+      Sound.playClick();
+      if (nowOpen) {
+        if (!greeted) {
+          greeted = true;
+          JARVIS.say(
+            "Systeme online. Frag mich nach Varianten, Universen, Filmen oder einem Duell — z.B. <em>„Vergleiche Thor und Hulk“</em>."
+          );
+        }
+        input.focus();
+      }
+    });
+
+    closeBtn.addEventListener("click", closeJarvis);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      JARVIS.say(text, "user");
+      input.value = "";
+      const answer = JARVIS.runCommand(text);
+      setTimeout(() => {
+        JARVIS.say(
+          answer ||
+            "Diesen Befehl kenne ich noch nicht. Tippe <em>Hilfe</em> für eine Übersicht — später kann hier eine KI andocken."
+        );
+      }, 220);
+    });
+  }
+  initJarvis();
+
+  // ---------- Easter Eggs ----------
+  function showSecret(icon, title, text) {
+    document.getElementById("secret-icon").textContent = icon;
+    document.getElementById("secret-title").textContent = title;
+    document.getElementById("secret-text").textContent = text;
+    openOverlay(document.getElementById("secret-overlay"));
+    Sound.playPower();
+  }
+
+  document.getElementById("secret-close").addEventListener("click", () => {
+    closeOverlay(document.getElementById("secret-overlay"));
+  });
+
+  // 1) Tastenfolge "TVA" schaltet den TVA-Modus um (Sepia-HUD der Zeitbehörde).
+  const TVA_SEQUENCE = ["t", "v", "a"];
+  let tvaProgress = 0;
+  window.addEventListener("keydown", (e) => {
+    const target = e.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+    const key = (e.key || "").toLowerCase();
+    if (key === TVA_SEQUENCE[tvaProgress]) {
+      tvaProgress++;
+      if (tvaProgress === TVA_SEQUENCE.length) {
+        tvaProgress = 0;
+        const active = document.body.classList.toggle("tva-mode");
+        if (active) {
+          showSecret(
+            "⧗",
+            "TVA-Modus aktiviert",
+            "Alle Zeitlinien werden überwacht. Abweichungen wurden protokolliert. Drücke erneut T-V-A, um zur heiligen Zeitlinie zurückzukehren."
+          );
+        } else {
+          showToast("⧗ Zeitlinie zurückgesetzt.");
+        }
+      }
+    } else {
+      tvaProgress = key === TVA_SEQUENCE[0] ? 1 : 0;
+    }
+  });
+
+  // 2) Mehrfaches Anklicken eines Infinity-Steins löst eine Spezialanimation aus.
+  const stoneClickCounts = {};
+  function registerStoneClick(stoneId, stoneName) {
+    stoneClickCounts[stoneId] = (stoneClickCounts[stoneId] || 0) + 1;
+    if (stoneClickCounts[stoneId] === 5) {
+      stoneClickCounts[stoneId] = 0;
+      document.body.classList.add("stone-surge");
+      Sound.playPower();
+      setTimeout(() => document.body.classList.remove("stone-surge"), 2400);
+      showToast(`💥 Der ${stoneName} reagiert auf deine Berührung…`, 4200);
+    }
+  }
+
+  // 3) Bestimmte Suchbegriffe schalten versteckte Multiversums-Nachrichten frei.
+  const SECRET_SEARCHES = [
+    {
+      test: /^(he who remains|der bleibt|kang)$/,
+      icon: "⌛",
+      title: "Am Ende der Zeit",
+      text: "Jemand sitzt seit jeher in der Zitadelle und schreibt jede Zeitlinie mit. Du warst hier schon einmal. Und wirst es wieder sein.",
+    },
+    {
+      test: /^(excelsior|stan lee)$/,
+      icon: "✶",
+      title: "Excelsior!",
+      text: "Immer weiter nach oben. Danke, dass du dieses Multiversum erkundest, True Believer.",
+    },
+    {
+      test: /^(i am iron man|ich bin iron man)$/,
+      icon: "◉",
+      title: "Arc-Reaktor online",
+      text: "Manche Sätze verändern ein ganzes Universum. Dieser hat es zweimal getan.",
+    },
+    {
+      test: /^(42|sokovia|ultron)$/,
+      icon: "⚙",
+      title: "Protokoll gefunden",
+      text: "In einer verworfenen Zeitlinie wurde dieses Protokoll nie gestartet. In dieser hier schon.",
+    },
+  ];
+
+  let lastSecretSearch = "";
+  function checkSecretSearch(query) {
+    const q = String(query || "").trim().toLowerCase();
+    if (!q || q === lastSecretSearch) return;
+    const hit = SECRET_SEARCHES.find((s) => s.test.test(q));
+    if (!hit) return;
+    lastSecretSearch = q;
+    showSecret(hit.icon, hit.title, hit.text);
+  }
+
+  // ---------- Multiverse Map (Verbindungen zwischen den Universen) ----------
+  function initMultiverseMap() {
+    const btn = document.getElementById("map-btn");
+    const overlay = document.getElementById("map-overlay");
+    const closeBtn = document.getElementById("map-close");
+    const canvas = document.getElementById("map-canvas");
+    const detail = document.getElementById("map-detail");
+
+    function render() {
+      const W = 720;
+      const H = 440;
+      const cx = W / 2;
+      const cy = H / 2;
+      const links = MarvelDerive.universeConnections();
+
+      // Universen kreisförmig anordnen; große Universen weiter innen.
+      const nodes = UNIVERSES.map((u, i) => {
+        const angle = -Math.PI / 2 + (i / UNIVERSES.length) * Math.PI * 2;
+        const radius = u.isDoomsday ? 108 : 176;
+        return {
+          universe: u,
+          x: cx + Math.cos(angle) * radius * 1.32,
+          y: cy + Math.sin(angle) * radius * 0.82,
+        };
+      });
+
+      const nodeById = {};
+      nodes.forEach((n) => (nodeById[n.universe.id] = n));
+
+      const lineEls = links
+        .map((l) => {
+          const a = nodeById[l.a.id];
+          const b = nodeById[l.b.id];
+          if (!a || !b) return "";
+          const width = Math.min(3.4, 0.9 + l.shared * 0.5);
+          return `<line class="map-link" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
+                     stroke="${l.a.accent}" stroke-width="${width}"
+                     data-a="${l.a.id}" data-b="${l.b.id}" data-shared="${l.shared}"/>`;
+        })
+        .join("");
+
+      const nodeEls = nodes
+        .map(
+          (n) => `
+        <g class="map-node" data-id="${n.universe.id}">
+          <circle class="map-halo" cx="${n.x}" cy="${n.y}" r="26" fill="${n.universe.accent}" fill-opacity="0.12"/>
+          <circle class="map-core" cx="${n.x}" cy="${n.y}" r="13" fill="${n.universe.accent}"
+                  fill-opacity="0.35" stroke="${n.universe.accent}" stroke-width="2"/>
+          <text class="map-label" x="${n.x}" y="${n.y + 34}">${n.universe.name}</text>
+          <text class="map-earth" x="${n.x}" y="${n.y + 46}">${n.universe.earth || ""}</text>
+        </g>`
+        )
+        .join("");
+
+      canvas.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"
+             aria-label="Karte der Verbindungen zwischen den Universen">
+          <g class="map-links">${lineEls}</g>
+          ${nodeEls}
+        </svg>`;
+
+      // Hover hebt ein Universum samt seiner Verbindungen hervor.
+      Array.prototype.forEach.call(canvas.querySelectorAll(".map-node"), (g) => {
+        const id = g.dataset.id;
+        const universe = UNIVERSES.find((u) => u.id === id);
+
+        g.addEventListener("pointerenter", () => {
+          canvas.querySelectorAll(".map-link").forEach((line) => {
+            const active = line.dataset.a === id || line.dataset.b === id;
+            line.classList.toggle("active", active);
+          });
+          const connected = links.filter((l) => l.a.id === id || l.b.id === id);
+          detail.innerHTML = `
+            <strong style="color:${universe.accent}">${universe.name}</strong>
+            <span>${universe.earth || ""} · ${universe.characters.length} Figuren</span>
+            <span>${
+              connected.length
+                ? "Verbunden mit: " +
+                  connected
+                    .map((l) => (l.a.id === id ? l.b.name : l.a.name))
+                    .join(", ")
+                : "Keine geteilten Figuren mit anderen Universen"
+            }</span>`;
+        });
+
+        g.addEventListener("pointerleave", () => {
+          canvas.querySelectorAll(".map-link").forEach((line) => line.classList.remove("active"));
+        });
+
+        // Klick fliegt direkt zum passenden Planeten.
+        g.addEventListener("click", () => {
+          closeOverlay(overlay);
+          selectUniverse(id);
+        });
+      });
+
+      detail.innerHTML = `<span>Fahre über ein Universum, um seine Verbindungen zu sehen.</span>`;
+    }
+
+    btn.addEventListener("click", () => {
+      render();
+      openOverlay(overlay);
+      Sound.playClick();
+    });
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
+  }
+  initMultiverseMap();
 
   // ---------- Theorien-Board (Fan-Theorien zu kommenden Filmen) ----------
   function initTheories() {
@@ -526,48 +1115,133 @@
     });
 
     btn.addEventListener("click", () => {
-      overlay.classList.remove("hidden");
+      openOverlay(overlay);
       render();
       Sound.playClick();
     });
-    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
   }
   initTheories();
 
-  // ---------- Suche (Charaktere & Filme) ----------
+  // ---------- Suche (Charaktere, Filme, Universen, Serien) ----------
   function initSearch() {
-    const searchIndex = SEARCH_INDEX;
     const wrap = document.getElementById("search-wrap");
     const input = document.getElementById("search-input");
     const results = document.getElementById("search-results");
 
+    const CATEGORIES = [
+      { key: "character", label: "Charaktere", limit: 5 },
+      { key: "movie", label: "Filme", limit: 4 },
+      { key: "universe", label: "Universen", limit: 3 },
+      { key: "series", label: "Serien", limit: 3 },
+    ];
+
+    // Universen und Serien ergänzen den bestehenden Index aus Figuren und Filmen.
+    const FULL_INDEX = SEARCH_INDEX.concat(
+      UNIVERSES.map((u) => ({
+        type: "universe",
+        label: u.name,
+        sub: `${u.earth || "Eigene Zeitlinie"} · ${u.characters.length} Figuren`,
+        universe: u,
+      })),
+      (typeof SERIES !== "undefined" ? SERIES : []).map((sr) => ({
+        type: "series",
+        label: sr.title,
+        sub: `${sr.year} · ${sr.phase}`,
+        series: sr,
+      }))
+    );
+
+    // Doppelte Filmtitel (mehrere Universen) nur einmal anzeigen.
+    function dedupeMovies(list) {
+      const seen = {};
+      return list.filter((m) => {
+        if (m.type !== "movie") return true;
+        if (seen[m.label]) return false;
+        seen[m.label] = true;
+        return true;
+      });
+    }
+
+    function thumbHTML(m) {
+      if (m.type === "character") {
+        return `<span class="search-thumb round">${characterFigureSVG(m.universe.accent, getInitials(m.character.name))}</span>`;
+      }
+      if (m.type === "movie" || m.type === "series") {
+        return `<span class="search-thumb poster">${posterAbbrev(m.label)}</span>`;
+      }
+      return `<span class="search-thumb universe" style="--u-a:${m.universe.colorA};--u-b:${m.universe.colorB}"></span>`;
+    }
+
+    // Lädt das passende Bild zum Treffer nach (Porträt, Poster oder Backdrop).
+    function loadThumb(el, m) {
+      const thumb = el.querySelector(".search-thumb");
+      if (!thumb) return;
+      if (m.type === "character") {
+        loadPersonInto(thumb, m.character);
+      } else if (m.type === "movie") {
+        loadPosterInto(thumb, m.label, m.year);
+      } else if (m.type === "series" && window.TMDB && TMDB.enabled()) {
+        TMDB.seriesPoster(m.label, m.series.year)
+          .then((url) => (url ? preload(url) : null))
+          .then((url) => {
+            if (url && thumb.isConnected) thumb.innerHTML = `<img src="${escapeAttr(url)}" alt="" loading="lazy">`;
+          })
+          .catch(() => {});
+      } else if (m.type === "universe") {
+        const meta = MarvelDerive.universeMeta(m.universe);
+        if (meta.mainFilm) loadPosterInto(thumb, meta.mainFilm.title, meta.mainFilm.year);
+      }
+    }
+
+    function activate(m) {
+      input.value = "";
+      results.classList.add("hidden");
+      if (m.type === "character") {
+        selectUniverse(m.universe.id);
+        setTimeout(() => openCharacterModal(m.character, m.universe), 300);
+      } else if (m.type === "movie") {
+        openFilmModal(m.label, m.year);
+      } else if (m.type === "universe") {
+        selectUniverse(m.universe.id);
+      } else if (m.type === "series") {
+        showToast(`📺 ${m.label} (${m.series.year}) — ${m.series.desc}`, 5200);
+      }
+    }
+
     function renderResults(matches) {
       results.innerHTML = "";
-      if (matches.length === 0) {
+      if (!matches.length) {
         results.innerHTML = `<div class="search-empty">Keine Treffer</div>`;
         results.classList.remove("hidden");
         return;
       }
-      matches.slice(0, 8).forEach((m) => {
-        const item = document.createElement("div");
-        item.className = "search-item";
-        item.style.setProperty("--accent-color", m.universe.accent);
-        item.innerHTML = `
-          <span class="search-tag">${m.type === "character" ? "★" : "🎬"}</span>
-          <div class="search-text">
-            <span class="search-label">${m.label}</span>
-            <span class="search-sub">${m.sub}</span>
-          </div>`;
-        item.addEventListener("click", () => {
-          selectUniverse(m.universe.id);
-          if (m.type === "character") {
-            setTimeout(() => openCharacterModal(m.character, m.universe), 300);
-          }
-          input.value = "";
-          results.classList.add("hidden");
+
+      CATEGORIES.forEach((cat) => {
+        const group = matches.filter((m) => m.type === cat.key).slice(0, cat.limit);
+        if (!group.length) return;
+
+        const heading = document.createElement("div");
+        heading.className = "search-group";
+        heading.textContent = cat.label;
+        results.appendChild(heading);
+
+        group.forEach((m) => {
+          const item = document.createElement("div");
+          item.className = "search-item";
+          item.style.setProperty("--accent-color", m.universe ? m.universe.accent : "#5b8bff");
+          item.innerHTML = `
+            ${thumbHTML(m)}
+            <div class="search-text">
+              <span class="search-label">${m.label}</span>
+              <span class="search-sub">${m.sub}</span>
+            </div>`;
+          loadThumb(item, m);
+          item.addEventListener("click", () => activate(m));
+          results.appendChild(item);
         });
-        results.appendChild(item);
       });
+
       results.classList.remove("hidden");
     }
 
@@ -577,7 +1251,11 @@
         results.classList.add("hidden");
         return;
       }
-      renderResults(searchIndex.filter((m) => m.label.toLowerCase().includes(q)));
+      checkSecretSearch(q);
+      const hits = FULL_INDEX.filter(
+        (m) => m.label.toLowerCase().indexOf(q) !== -1 || (m.sub || "").toLowerCase().indexOf(q) !== -1
+      );
+      renderResults(dedupeMovies(hits));
     });
 
     input.addEventListener("focus", () => {
@@ -621,7 +1299,7 @@
         if (e.target.closest(".fav-heart")) return;
         selectUniverse(uid);
         setTimeout(() => openCharacterModal(entry.character, entry.universe), 300);
-        document.getElementById("favorites-overlay").classList.add("hidden");
+        closeOverlay(document.getElementById("favorites-overlay"));
       });
       row.querySelector(".fav-heart").addEventListener("click", (e) => {
         e.stopPropagation();
@@ -639,14 +1317,22 @@
     const closeBtn = document.getElementById("favorites-close");
     btn.addEventListener("click", () => {
       renderFavoritesList();
-      overlay.classList.remove("hidden");
+      openOverlay(overlay);
       Sound.playClick();
     });
-    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
   }
   initFavorites();
 
   // ---------- Charakter-Vergleich ----------
+  let compareApi = null;
+
+  function openCompareWith(entryA, entryB) {
+    if (!compareApi) return;
+    closeJarvisSoft();
+    compareApi.set(entryA, entryB);
+  }
+
   function initCompare() {
     const btn = document.getElementById("compare-btn");
     const overlay = document.getElementById("compare-overlay");
@@ -659,14 +1345,18 @@
         resultEl.innerHTML = "";
         return;
       }
+
+      const battleA = MarvelDerive.battleScore(picked.a.character);
+      const battleB = MarvelDerive.battleScore(picked.b.character);
+
       const card = (entry) => {
         const films = entry.character.films || [];
-        const firstYear = films.length ? Math.min(...films.map((f) => f.year)) : "–";
+        const firstYear = films.length ? Math.min.apply(null, films.map((f) => f.year)) : "–";
         const powerChips = powerChipsHTML(entry.character.powers, entry.universe.accent);
         return `
           <div class="compare-card" style="--accent-color:${entry.universe.accent}">
             <div class="compare-avatar-wrap">
-              <div class="compare-avatar">${characterVisualHTML(entry.character, entry.universe, getInitials(entry.character.name))}</div>
+              <div class="compare-avatar" data-portrait="${entry === picked.a ? "a" : "b"}">${characterVisualHTML(entry.character, entry.universe, getInitials(entry.character.name))}</div>
             </div>
             <h3>${entry.character.name}</h3>
             <div class="compare-role">${entry.character.role}</div>
@@ -676,7 +1366,76 @@
             <div class="compare-powers">${powerChips}</div>
           </div>`;
       };
-      resultEl.innerHTML = `${card(picked.a)}<div class="compare-vs">VS</div>${card(picked.b)}`;
+
+      // Gegenüberstellung der Werte: zwei Balken, die aus der Mitte wachsen.
+      const duelRows = battleA.stats
+        .map((statA, i) => {
+          const statB = battleB.stats[i];
+          const leadA = statA.value > statB.value;
+          const leadB = statB.value > statA.value;
+          return `
+            <div class="duel-row">
+              <span class="duel-value${leadA ? " lead" : ""}">${statA.value}</span>
+              <span class="duel-track left">
+                <span class="duel-fill" data-value="${statA.value}" style="--fill-color:${picked.a.universe.accent}"></span>
+              </span>
+              <span class="duel-label">${statA.label}</span>
+              <span class="duel-track right">
+                <span class="duel-fill" data-value="${statB.value}" style="--fill-color:${picked.b.universe.accent}"></span>
+              </span>
+              <span class="duel-value${leadB ? " lead" : ""}">${statB.value}</span>
+            </div>`;
+        })
+        .join("");
+
+      const winner =
+        battleA.score === battleB.score
+          ? null
+          : battleA.score > battleB.score
+          ? picked.a
+          : picked.b;
+
+      const verdict = winner
+        ? `Nach dieser Rechnung hätte <strong style="color:${winner.universe.accent}">${winner.character.name}</strong> die besseren Karten.`
+        : "Nach dieser Rechnung steht es exakt unentschieden.";
+
+      resultEl.innerHTML = `
+        ${card(picked.a)}<div class="compare-vs">VS</div>${card(picked.b)}
+        <div class="duel-block">
+          <h3 class="duel-heading">Wer würde gewinnen?</h3>
+          <div class="duel-rows">${duelRows}</div>
+          <div class="duel-total">
+            <div class="duel-total-side" style="--accent-color:${picked.a.universe.accent}">
+              <span class="duel-total-name">${picked.a.character.name}</span>
+              <span class="duel-total-score${battleA.score >= battleB.score ? " lead" : ""}">${battleA.score}</span>
+            </div>
+            <span class="duel-total-label">GESAMTWERTUNG</span>
+            <div class="duel-total-side" style="--accent-color:${picked.b.universe.accent}">
+              <span class="duel-total-name">${picked.b.character.name}</span>
+              <span class="duel-total-score${battleB.score >= battleA.score ? " lead" : ""}">${battleB.score}</span>
+            </div>
+          </div>
+          <p class="duel-verdict">${verdict}</p>
+          <p class="duel-disclaimer">
+            Spielerische Einschätzung: Die Werte werden aus Kräften und Biografie dieser Seite
+            berechnet und sind keine offiziellen Marvel-Angaben. Im Film entscheiden Drehbuch,
+            Umgebung und Verbündete — nicht diese Tabelle.
+          </p>
+        </div>`;
+
+      // Balken animiert aus der Mitte wachsen lassen
+      requestAnimationFrame(() => {
+        Array.prototype.forEach.call(resultEl.querySelectorAll(".duel-fill"), (el, i) => {
+          el.style.transitionDelay = (i % 2 === 0 ? i * 35 : (i - 1) * 35) + "ms";
+          el.style.width = el.dataset.value + "%";
+        });
+      });
+
+      // Echte Porträts nachladen, sobald verfügbar
+      const portraitA = resultEl.querySelector('[data-portrait="a"]');
+      const portraitB = resultEl.querySelector('[data-portrait="b"]');
+      if (portraitA) loadPersonInto(portraitA, picked.a.character);
+      if (portraitB) loadPersonInto(portraitB, picked.b.character);
     }
 
     function makePicker(inputId, resultsId, slot) {
@@ -723,11 +1482,24 @@
     makePicker("compare-input-a", "compare-results-a", "a");
     makePicker("compare-input-b", "compare-results-b", "b");
 
+    // Erlaubt anderen Teilen der Seite (z.B. J.A.R.V.I.S.), den Vergleich direkt
+    // mit zwei Figuren zu öffnen.
+    compareApi = {
+      set(entryA, entryB) {
+        picked.a = entryA;
+        picked.b = entryB;
+        document.getElementById("compare-input-a").value = entryA.character.name;
+        document.getElementById("compare-input-b").value = entryB.character.name;
+        renderComparison();
+        openOverlay(overlay);
+      },
+    };
+
     btn.addEventListener("click", () => {
-      overlay.classList.remove("hidden");
+      openOverlay(overlay);
       Sound.playClick();
     });
-    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
   }
   initCompare();
 
@@ -1336,6 +2108,13 @@
       dot.className = "stone-dot" + (collected.includes(s.id) ? " collected" : "");
       dot.style.setProperty("--stone-color", "#" + s.color.toString(16).padStart(6, "0"));
       dot.title = s.name;
+      // Easter Egg: einen gesammelten Stein mehrfach antippen
+      dot.addEventListener("click", () => {
+        if (!collected.includes(s.id)) return;
+        dot.classList.add("pulse");
+        setTimeout(() => dot.classList.remove("pulse"), 400);
+        registerStoneClick(s.id, s.name);
+      });
       el.appendChild(dot);
     });
     el.classList.remove("hidden");
@@ -1387,13 +2166,13 @@
     if (collected.length >= INFINITY_STONES.length) {
       setTimeout(() => {
         Sound.playPower();
-        document.getElementById("snap-overlay").classList.remove("hidden");
+        openOverlay(document.getElementById("snap-overlay"));
       }, 600);
     }
   }
 
   document.getElementById("snap-close").addEventListener("click", () => {
-    document.getElementById("snap-overlay").classList.add("hidden");
+    closeOverlay(document.getElementById("snap-overlay"));
   });
 
   // ---------- Achievement: alle Universen besucht ----------
@@ -1505,6 +2284,7 @@
     activeId = id;
     hint.style.display = "none";
     Sound.playWhoosh();
+    playWarpFlash(p.data.accent);
     recordVisit(id);
 
     // Zielposition der Kamera: leicht über und vor dem Planeten, dann sanft
@@ -1563,11 +2343,8 @@
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       deselect();
-      document.getElementById("travel-overlay").classList.add("hidden");
-      document.getElementById("character-modal").classList.add("hidden");
-      document.getElementById("favorites-overlay").classList.add("hidden");
-      document.getElementById("compare-overlay").classList.add("hidden");
-      document.getElementById("snap-overlay").classList.add("hidden");
+      BLOCKING_OVERLAY_IDS.forEach((id) => closeOverlay(document.getElementById(id)));
+      closeJarvis();
     }
   });
 
@@ -2027,6 +2804,49 @@
       .join("");
   }
 
+  // ---------- Varianten-Karten (dieselbe Figur in anderen Universen) ----------
+  function renderVariantCards(container, character, universe, variants) {
+    // Die aktuelle Fassung steht als erste Karte mit dabei, damit der Vergleich
+    // zwischen den Universen sofort sichtbar ist.
+    const all = [{ character, universe, current: true }].concat(
+      variants.map((v) => ({ character: v.character, universe: v.universe, current: false }))
+    );
+
+    if (all.length < 2) {
+      container.classList.remove("variant-grid");
+      container.innerHTML = `<span class="relation-empty">Keine weiteren Varianten dieser Figur bekannt.</span>`;
+      return;
+    }
+
+    container.classList.add("variant-grid");
+    container.innerHTML = all
+      .map(
+        (v, i) => `
+        <button class="variant-card${v.current ? " current" : ""}" type="button" data-idx="${i}"
+                style="--accent-color:${v.universe.accent}">
+          <span class="variant-portrait" data-portrait="${i}"></span>
+          <span class="variant-meta">
+            <span class="variant-universe">${v.universe.name}</span>
+            <span class="variant-role">${v.character.role}</span>
+            <span class="variant-earth">${v.universe.earth || ""}</span>
+          </span>
+          ${v.current ? '<span class="variant-flag">AKTUELL</span>' : ""}
+        </button>`
+      )
+      .join("");
+
+    Array.prototype.forEach.call(container.querySelectorAll(".variant-card"), (card) => {
+      const entry = all[Number(card.dataset.idx)];
+      const portrait = card.querySelector(".variant-portrait");
+      portrait.innerHTML = characterVisualHTML(entry.character, entry.universe, getInitials(entry.character.name));
+      loadPersonInto(portrait, entry.character);
+      card.addEventListener("click", () => {
+        if (entry.current) return;
+        openCharacterModal(entry.character, entry.universe);
+      });
+    });
+  }
+
   // ---------- Interaktives Verbindungs-Netzwerk ----------
   const NET_COLORS = {
     ally: "#3fd0ff",
@@ -2219,25 +3039,255 @@
       relations.affiliations.concat(relations.teams.map((t) => ({ label: t, sub: "", accent: NET_COLORS.team }))),
       "Keine Zugehörigkeiten hinterlegt."
     );
-    renderRelationChips(
-      document.getElementById("character-variants"),
-      relations.variants,
-      NET_COLORS.variant,
-      "Keine weiteren Varianten dieser Figur bekannt."
-    );
+    renderVariantCards(document.getElementById("character-variants"), c, universe, relations.variants);
 
-    modal.classList.remove("hidden");
+    openOverlay(modal);
   }
 
   document.getElementById("character-close").addEventListener("click", () => {
-    document.getElementById("character-modal").classList.add("hidden");
+    closeOverlay(document.getElementById("character-modal"));
+  });
+
+  // ---------- Film-Detailansicht ----------
+  let filmToken = 0;
+
+  function openFilmModal(title, year) {
+    Sound.playClick();
+    filmToken++;
+    const token = filmToken;
+
+    const info = MarvelDerive.filmInfo(title);
+    const era = MarvelDerive.eraFor(title);
+    const modal = document.getElementById("film-modal");
+    const card = document.getElementById("film-card");
+
+    // Universen, in denen dieser Film vorkommt (färbt auch den Akzent)
+    const universes = UNIVERSES.filter((u) => (u.movies || []).some((m) => m.title === title));
+    const accent = universes.length ? universes[0].accent : "#ff4d4d";
+    card.style.setProperty("--accent-color", accent);
+    card.scrollTop = 0;
+
+    document.getElementById("film-title").textContent = title;
+    document.getElementById("film-phase").textContent = info ? info.phase.toUpperCase() : "FILM";
+    const yearBadge = document.getElementById("film-year");
+    if (year) {
+      yearBadge.textContent = String(year);
+      yearBadge.classList.remove("hidden");
+    } else {
+      yearBadge.classList.add("hidden");
+    }
+    const eraBadge = document.getElementById("film-era");
+    if (era) {
+      eraBadge.textContent = era.era.toUpperCase();
+      eraBadge.classList.remove("hidden");
+    } else {
+      eraBadge.classList.add("hidden");
+    }
+    document.getElementById("film-desc").textContent = info
+      ? info.desc
+      : "Zu diesem Film liegt noch keine Beschreibung vor.";
+
+    // Poster + Backdrop dynamisch, Kürzel/Verlauf als Fallback
+    const posterEl = document.getElementById("film-poster");
+    posterEl.innerHTML = `<span class="film-abbrev">${posterAbbrev(title)}</span>`;
+    loadPosterInto(posterEl, title, year);
+
+    const bg = document.getElementById("film-hero-bg");
+    bg.classList.remove("loaded");
+    bg.classList.add("fallback");
+    bg.style.backgroundImage = "";
+    if (window.TMDB && TMDB.enabled()) {
+      TMDB.movieBackdrop(title, year)
+        .then((url) => (url ? preload(url) : null))
+        .then((url) => {
+          if (!url || token !== filmToken) return;
+          bg.style.backgroundImage = `url("${url}")`;
+          bg.classList.remove("fallback");
+          bg.classList.add("loaded");
+        })
+        .catch(() => {});
+
+      // Ausführlichere Beschreibung, falls die API eine liefert
+      TMDB.movieDetails(title, year)
+        .then((details) => {
+          if (!details || !details.overview || token !== filmToken) return;
+          document.getElementById("film-desc").textContent = details.overview;
+        })
+        .catch(() => {});
+    }
+
+    // Universen als klickbare Chips
+    const uniWrap = document.getElementById("film-universes");
+    document.getElementById("film-universes-section").hidden = universes.length === 0;
+    uniWrap.innerHTML = universes
+      .map(
+        (u, i) => `
+        <button class="relation-chip" type="button" data-idx="${i}" style="--chip-color:${u.accent}">
+          <span class="chip-dot"></span>
+          <span class="chip-text">
+            <span>${u.name}</span>
+            <span class="chip-sub">${u.earth || ""}</span>
+          </span>
+        </button>`
+      )
+      .join("");
+    Array.prototype.forEach.call(uniWrap.querySelectorAll(".relation-chip"), (chip) => {
+      chip.addEventListener("click", () => {
+        const u = universes[Number(chip.dataset.idx)];
+        if (!u) return;
+        closeOverlay(modal);
+        closeOverlay(document.getElementById("travel-overlay"));
+        selectUniverse(u.id);
+      });
+    });
+
+    // Figuren, die in diesem Film auftreten
+    const charWrap = document.getElementById("film-characters");
+    const entries = [];
+    UNIVERSES.forEach((u) => {
+      (u.characters || []).forEach((c) => {
+        if ((c.films || []).some((f) => f.title === title)) entries.push({ character: c, universe: u });
+      });
+    });
+    document.getElementById("film-characters-section").hidden = entries.length === 0;
+    renderRelationChips(charWrap, entries.slice(0, 16), null, "Keine Figuren hinterlegt.");
+
+    openOverlay(modal);
+  }
+
+  document.getElementById("film-close").addEventListener("click", () => {
+    closeOverlay(document.getElementById("film-modal"));
   });
 
   // ---------- Fill side panel ----------
+  let panelToken = 0;
+
+  // Großes Hintergrundbild des Panels: Backdrop des Hauptfilms, sonst Verlauf.
+  function applyPanelHero(u, meta) {
+    const bg = document.getElementById("panel-hero-bg");
+    const logo = document.getElementById("panel-logo");
+    bg.classList.remove("loaded");
+    bg.classList.add("fallback");
+    bg.style.backgroundImage = "";
+    logo.hidden = true;
+    logo.removeAttribute("src");
+
+    if (!meta.mainFilm || !window.TMDB || !TMDB.enabled()) return;
+    const token = panelToken;
+
+    TMDB.movieBackdrop(meta.mainFilm.title, meta.mainFilm.year)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || token !== panelToken) return;
+        bg.style.backgroundImage = `url("${url}")`;
+        bg.classList.remove("fallback");
+        bg.classList.add("loaded");
+      })
+      .catch(() => {});
+
+    TMDB.movieLogo(meta.mainFilm.title, meta.mainFilm.year)
+      .then((url) => (url ? preload(url) : null))
+      .then((url) => {
+        if (!url || token !== panelToken) return;
+        logo.src = url;
+        logo.alt = meta.mainFilm.title;
+        logo.hidden = false;
+      })
+      .catch(() => {});
+  }
+
+  // Trailer-Vorschaubild (YouTube-Standbild, funktioniert ohne TMDB-Key).
+  function applyTrailerThumb(u) {
+    const thumb = document.getElementById("trailer-thumb");
+    thumb.innerHTML = "";
+    thumb.style.backgroundImage = "";
+    if (!u.trailerYouTubeId || !window.TMDB) return;
+    const url = TMDB.youtubeThumb(u.trailerYouTubeId);
+    const token = panelToken;
+    preload(url)
+      .then(() => {
+        if (token !== panelToken) return;
+        thumb.style.backgroundImage = `url("${url}")`;
+      })
+      .catch(() => {
+        // maxresdefault existiert nicht für jedes Video — auf hqdefault ausweichen
+        const fallbackUrl = `https://img.youtube.com/vi/${u.trailerYouTubeId}/hqdefault.jpg`;
+        preload(fallbackUrl)
+          .then(() => {
+            if (token === panelToken) thumb.style.backgroundImage = `url("${fallbackUrl}")`;
+          })
+          .catch(() => {});
+      });
+  }
+
   function fillPanel(u) {
+    panelToken++;
+    const meta = MarvelDerive.universeMeta(u);
+
     document.getElementById("panel-eyebrow").textContent = u.eyebrow.toUpperCase();
     document.getElementById("panel-title").textContent = u.name;
     document.getElementById("panel-desc").textContent = u.desc;
+    document.getElementById("panel").style.setProperty("--accent-color", u.accent);
+
+    applyPanelHero(u, meta);
+    applyTrailerThumb(u);
+
+    // Veröffentlichung / Status / Timeline-Position
+    const releaseText = u.releaseDate
+      ? new Date(u.releaseDate).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" })
+      : meta.firstYear
+      ? meta.firstYear === meta.lastYear
+        ? String(meta.firstYear)
+        : `${meta.firstYear} – ${meta.lastYear}`
+      : "—";
+    document.getElementById("panel-release").textContent = releaseText;
+    document.getElementById("panel-status").textContent = meta.status;
+    // Bei vielen Epochen nur die ersten beiden nennen, damit die Kachel kompakt bleibt.
+    const timelineParts = meta.eras.length ? meta.eras : meta.phases;
+    document.getElementById("panel-timeline").textContent = timelineParts.length
+      ? timelineParts.slice(0, 2).join(" · ") + (timelineParts.length > 2 ? ` +${timelineParts.length - 2}` : "")
+      : "Eigene Zeitlinie";
+    document.getElementById("panel-timeline").title = timelineParts.join(" · ");
+
+    // Verwandte Filme (gleiche MCU-Phase, anderes Universum)
+    const relatedFilmsSection = document.getElementById("panel-related-films-section");
+    if (meta.relatedFilms.length) {
+      relatedFilmsSection.hidden = false;
+      renderFilmGrid(
+        document.getElementById("panel-related-films"),
+        meta.relatedFilms.map((f) => ({ title: f.title, year: "", note: f.phase })),
+        u.accent
+      );
+    } else {
+      relatedFilmsSection.hidden = true;
+    }
+
+    // Verwandte Universen (teilen sich Figuren)
+    const relatedUniSection = document.getElementById("panel-related-universes-section");
+    const relatedUniList = document.getElementById("panel-related-universes");
+    if (meta.related.length) {
+      relatedUniSection.hidden = false;
+      relatedUniList.innerHTML = meta.related
+        .map(
+          (r, i) => `
+          <button class="relation-chip" type="button" data-idx="${i}" style="--chip-color:${r.universe.accent}">
+            <span class="chip-dot"></span>
+            <span class="chip-text">
+              <span>${r.universe.name}</span>
+              <span class="chip-sub">${r.shared} gemeinsame ${r.shared === 1 ? "Figur" : "Figuren"}</span>
+            </span>
+          </button>`
+        )
+        .join("");
+      Array.prototype.forEach.call(relatedUniList.querySelectorAll(".relation-chip"), (chip) => {
+        chip.addEventListener("click", () => {
+          const entry = meta.related[Number(chip.dataset.idx)];
+          if (entry) selectUniverse(entry.universe.id);
+        });
+      });
+    } else {
+      relatedUniSection.hidden = true;
+    }
 
     const countdownBlock = document.getElementById("countdown-block");
     if (u.isDoomsday) {
@@ -2291,11 +3341,13 @@
     u.movies.forEach((m) => {
       const li = document.createElement("li");
       li.style.setProperty("--accent-color", u.accent);
+      li.className = "clickable";
       li.innerHTML = `
         <span class="mposter">${posterAbbrev(m.title)}</span>
         <span class="mtitle">${m.title}</span>
         <span class="myear">${m.year}</span>`;
       loadPosterInto(li.querySelector(".mposter"), m.title, m.year);
+      li.addEventListener("click", () => openFilmModal(m.title, m.year));
       movieList.appendChild(li);
     });
   }
@@ -2340,8 +3392,14 @@
 
   function animate() {
     requestAnimationFrame(animate);
-    const dt = clock.getDelta();
+    // dt begrenzen, damit nach einer Pause (Tab im Hintergrund, offenes Overlay)
+    // kein Sprung entsteht.
+    const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
+
+    // Liegt eine Vollbild-Ebene über der Szene oder ist der Tab inaktiv, wird
+    // weder gerechnet noch gezeichnet.
+    if (renderPaused) return;
 
     planetObjects.forEach((p) => {
       // Der fokussierte Planet bleibt während der Ansicht an Ort und Stelle stehen,

@@ -130,27 +130,39 @@ const MCU_CHRONO_TIMELINE = [
       { title: "Thor: The Dark World", year: 2013 },
       { title: "Iron Man 3", year: 2013 },
       { title: "Captain America: The Return of the First Avenger", year: 2014 },
+    ],
+  },
+  {
+    era: "Kosmische Expansion",
+    years: "2014",
+    films: [
       { title: "Guardians of the Galaxy", year: 2014 },
       { title: "Guardians of the Galaxy Vol. 2", year: 2014 },
     ],
   },
   {
     era: "Zeitalter von Ultron",
-    years: "2015 – 2016",
+    years: "2015",
     films: [
       { title: "Avengers: Age of Ultron", year: 2015 },
       { title: "Ant-Man", year: 2015 },
+    ],
+  },
+  {
+    era: "Der Bürgerkrieg der Helden",
+    years: "2016 – 2017",
+    films: [
       { title: "Captain America: Civil War", year: 2016 },
       { title: "Black Panther", year: 2016 },
       { title: "Spider-Man: Homecoming", year: 2016 },
       { title: "Doctor Strange", year: 2016 },
+      { title: "Thor: Ragnarok", year: 2017 },
     ],
   },
   {
     era: "Der Krieg mit Thanos",
-    years: "2017 – 2023",
+    years: "2018 – 2023",
     films: [
-      { title: "Thor: Ragnarok", year: 2017 },
       { title: "Avengers: Infinity War", year: 2018 },
       { title: "Ant-Man and the Wasp", year: 2018 },
       { title: "Avengers: Endgame", year: 2023 },
@@ -164,16 +176,22 @@ const MCU_CHRONO_TIMELINE = [
       { title: "Black Widow", year: 2016, note: "Rückblende" },
       { title: "Shang-Chi and the Legend of the Ten Rings", year: 2024 },
       { title: "Eternals", year: 2024 },
-      { title: "Spider-Man: No Way Home", year: 2024 },
-      { title: "Doctor Strange in the Multiverse of Madness", year: 2024 },
     ],
   },
   {
-    era: "Multiversum & neue Bedrohungen",
+    era: "Das Multiversum bricht auf",
     years: "2024 – 2025",
     films: [
+      { title: "Spider-Man: No Way Home", year: 2024 },
+      { title: "Doctor Strange in the Multiverse of Madness", year: 2024 },
       { title: "Thor: Love and Thunder", year: 2024 },
       { title: "Black Panther: Wakanda Forever", year: 2025 },
+    ],
+  },
+  {
+    era: "Neue Helden, neue Fronten",
+    years: "2025",
+    films: [
       { title: "Ant-Man and the Wasp: Quantumania", year: 2025 },
       { title: "Guardians of the Galaxy Vol. 3", year: 2025 },
       { title: "The Marvels", year: 2025 },
@@ -190,6 +208,72 @@ const MCU_CHRONO_TIMELINE = [
       { title: "Avengers: Doomsday", year: 2026, finale: true },
     ],
   },
+];
+
+// Zusatzinfos je Film: MCU-Phase und eine kurze Beschreibung. Beide Zeitleisten
+// (Kinostart und Handlung) greifen darauf zu, damit die Texte nur einmal gepflegt
+// werden müssen.
+const FILM_INFO = {
+  "Iron Man": { phase: "Phase 1", desc: "Ein Waffenfabrikant baut sich in Gefangenschaft einen Panzeranzug — und wird zum Helden." },
+  "Der unglaubliche Hulk": { phase: "Phase 1", desc: "Bruce Banner ist auf der Flucht vor dem Militär und vor sich selbst." },
+  "Iron Man 2": { phase: "Phase 1", desc: "Der Ruhm fordert seinen Preis, während ein alter Familienfeind auftaucht." },
+  "Thor": { phase: "Phase 1", desc: "Ein arroganter Thronfolger wird auf die Erde verbannt und lernt Demut." },
+  "Captain America: The First Avenger": { phase: "Phase 1", desc: "Ein schmächtiger Rekrut wird im Zweiten Weltkrieg zum Super-Soldaten." },
+  "The Avengers": { phase: "Phase 1", desc: "Loki greift New York an — und zwingt sechs Einzelgänger zu einem Team." },
+
+  "Iron Man 3": { phase: "Phase 2", desc: "Nach der Schlacht um New York kämpft Tony Stark gegen Panikattacken und den Mandarin." },
+  "Thor: The Dark World": { phase: "Phase 2", desc: "Die Dunkelelfen wollen das Universum zurück in die Finsternis stürzen." },
+  "Captain America: The Return of the First Avenger": { phase: "Phase 2", desc: "S.H.I.E.L.D. ist unterwandert — und Steves totgeglaubter Freund ist die Waffe." },
+  "Guardians of the Galaxy": { phase: "Phase 2", desc: "Eine Bande von Außenseitern stolpert in die Rettung der Galaxis." },
+  "Avengers: Age of Ultron": { phase: "Phase 2", desc: "Tonys Friedensprogramm wird zur größten Bedrohung der Erde." },
+  "Ant-Man": { phase: "Phase 2", desc: "Ein Ex-Häftling erbt einen Anzug, der ihn auf Ameisengröße schrumpfen lässt." },
+
+  "Captain America: Civil War": { phase: "Phase 3", desc: "Die Sokovia-Abkommen spalten die Avengers in zwei verfeindete Lager." },
+  "Doctor Strange": { phase: "Phase 3", desc: "Ein Star-Chirurg verliert seine Hände und findet die Mystik." },
+  "Guardians of the Galaxy Vol. 2": { phase: "Phase 3", desc: "Peter Quill trifft seinen Vater — und wünscht sich bald, er hätte es nicht." },
+  "Spider-Man: Homecoming": { phase: "Phase 3", desc: "Peter Parker will Avenger werden, muss aber erst die Highschool überstehen." },
+  "Thor: Ragnarok": { phase: "Phase 3", desc: "Asgard fällt, Hela herrscht, und Thor landet als Gladiator auf Sakaar." },
+  "Black Panther": { phase: "Phase 3", desc: "T'Challa besteigt Wakandas Thron und wird von der eigenen Familiengeschichte eingeholt." },
+  "Avengers: Infinity War": { phase: "Phase 3", desc: "Thanos sammelt die Infinity-Steine. Die Helden verlieren." },
+  "Ant-Man and the Wasp": { phase: "Phase 3", desc: "Eine Rettungsmission in den Quantenbereich, während draußen die Welt kippt." },
+  "Captain Marvel": { phase: "Phase 3", desc: "Carol Danvers entdeckt zwischen Kree und Skrulls ihre wahre Herkunft." },
+  "Avengers: Endgame": { phase: "Phase 3", desc: "Fünf Jahre nach dem Snap wagen die Avengers den Zeitraub." },
+  "Spider-Man: Far From Home": { phase: "Phase 3", desc: "Peter will Urlaub in Europa — und bekommt Mysterio." },
+
+  "Black Widow": { phase: "Phase 4", desc: "Natasha Romanoff stellt sich ihrer Vergangenheit im Roten Raum." },
+  "Shang-Chi and the Legend of the Ten Rings": { phase: "Phase 4", desc: "Ein Parkservice-Fahrer aus San Francisco ist in Wahrheit der Sohn eines Kriegsherrn." },
+  "Eternals": { phase: "Phase 4", desc: "Unsterbliche Beschützer greifen nach Jahrtausenden wieder in die Geschichte ein." },
+  "Spider-Man: No Way Home": { phase: "Phase 4", desc: "Ein misslungener Zauber reißt das Multiversum auf." },
+  "Doctor Strange in the Multiverse of Madness": { phase: "Phase 4", desc: "Strange jagt durch fremde Realitäten — verfolgt von der Scarlet Witch." },
+  "Thor: Love and Thunder": { phase: "Phase 4", desc: "Gorr will alle Götter töten, und Jane Foster schwingt plötzlich Mjölnir." },
+  "Black Panther: Wakanda Forever": { phase: "Phase 4", desc: "Wakanda trauert und trifft auf Namors Unterwasserreich." },
+
+  "Ant-Man and the Wasp: Quantumania": { phase: "Phase 5", desc: "Die Familie Lang strandet im Quantenreich — direkt vor Kang." },
+  "Guardians of the Galaxy Vol. 3": { phase: "Phase 5", desc: "Rockets Vergangenheit holt die Guardians ein letztes Mal ein." },
+  "The Marvels": { phase: "Phase 5", desc: "Drei Heldinnen tauschen bei jedem Lichtblitz ungewollt die Plätze." },
+  "Deadpool & Wolverine": { phase: "Phase 5", desc: "Ein Söldner mit großer Klappe zerrt Logan quer durchs Multiversum." },
+
+  "Captain America: Brave New World": { phase: "Phase 6", desc: "Sam Wilson trägt den Schild — und gerät in eine Staatsverschwörung." },
+  "Thunderbolts*": { phase: "Phase 6", desc: "Eine Gruppe von Antihelden wird unfreiwillig zur letzten Verteidigungslinie." },
+  "The Fantastic Four: First Steps": { phase: "Phase 6", desc: "Marvels erste Familie tritt in einer retro-futuristischen Welt gegen Galactus an." },
+  "Avengers: Doomsday": { phase: "Phase 6", desc: "Doctor Doom greift nach dem Multiversum — alle Helden müssen zusammenstehen." },
+};
+
+// Disney+-Serien: ergänzen Suche und Detailpanel um das Serien-Universum.
+const SERIES = [
+  { title: "WandaVision", year: 2021, phase: "Phase 4", desc: "Wanda erschafft aus Trauer eine Sitcom-Realität — und hält eine ganze Stadt gefangen." },
+  { title: "The Falcon and the Winter Soldier", year: 2021, phase: "Phase 4", desc: "Sam und Bucky streiten um das Erbe des Schildes." },
+  { title: "Loki", year: 2021, phase: "Phase 4", desc: "Eine Loki-Variante landet bei der TVA und bringt die heilige Zeitlinie zum Einsturz." },
+  { title: "What If…?", year: 2021, phase: "Phase 4", desc: "Der Watcher zeigt Realitäten, in denen alles anders lief." },
+  { title: "Hawkeye", year: 2021, phase: "Phase 4", desc: "Clint Barton will Weihnachten feiern und bekommt stattdessen Kate Bishop." },
+  { title: "Moon Knight", year: 2022, phase: "Phase 4", desc: "Ein Museumsangestellter teilt sich Körper und Leben mit einem ägyptischen Mondritter." },
+  { title: "Ms. Marvel", year: 2022, phase: "Phase 4", desc: "Eine Teenagerin aus Jersey City entdeckt kosmische Kräfte in einem Familienerbstück." },
+  { title: "She-Hulk: Die Anwältin", year: 2022, phase: "Phase 4", desc: "Jennifer Walters verklagt, verteidigt — und wird dabei grün." },
+  { title: "Secret Invasion", year: 2023, phase: "Phase 5", desc: "Nick Fury jagt Skrull-Rebellen, die sich überall eingeschlichen haben." },
+  { title: "Echo", year: 2024, phase: "Phase 5", desc: "Maya Lopez kehrt zu ihren Wurzeln zurück und bricht mit Kingpin." },
+  { title: "Agatha All Along", year: 2024, phase: "Phase 5", desc: "Agatha Harkness sammelt einen Hexenzirkel für den Weg der Prüfungen." },
+  { title: "Daredevil: Born Again", year: 2025, phase: "Phase 5", desc: "Matt Murdock und Wilson Fisk treffen in einem neuen New York aufeinander." },
+  { title: "Ironheart", year: 2025, phase: "Phase 5", desc: "Riri Williams baut die nächste Generation gepanzerter Technik — und trifft auf Magie." },
 ];
 
 // Datengrundlage für alle Marvel-Universen, die als Planeten dargestellt werden.

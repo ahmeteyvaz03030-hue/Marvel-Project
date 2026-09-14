@@ -215,5 +215,139 @@ window.MarvelDerive = (function () {
     };
   }
 
-  return { STAT_DEFS, statsFor, relationsFor, findCharacter, baseName };
+  // ---------- Film- und Universums-Metadaten ----------
+  function filmInfo(title) {
+    return (typeof FILM_INFO !== "undefined" && FILM_INFO[title]) || null;
+  }
+
+  function phaseFor(title) {
+    const info = filmInfo(title);
+    return info ? info.phase : "";
+  }
+
+  function eraFor(title) {
+    if (typeof MCU_CHRONO_TIMELINE === "undefined") return null;
+    for (let i = 0; i < MCU_CHRONO_TIMELINE.length; i++) {
+      const era = MCU_CHRONO_TIMELINE[i];
+      if (era.films.some((f) => f.title === title)) {
+        return { era: era.era, years: era.years, index: i, total: MCU_CHRONO_TIMELINE.length };
+      }
+    }
+    return null;
+  }
+
+  // Status eines Universums aus den Erscheinungsjahren seiner Filme ableiten.
+  function universeMeta(universe) {
+    const movies = universe.movies || [];
+    const years = movies.map((m) => m.year).filter(Boolean);
+    const firstYear = years.length ? Math.min.apply(null, years) : null;
+    const lastYear = years.length ? Math.max.apply(null, years) : null;
+    const nowYear = new Date().getFullYear();
+
+    let status = "Abgeschlossen";
+    if (universe.releaseDate && new Date(universe.releaseDate).getTime() > Date.now()) {
+      status = "In Produktion";
+    } else if (lastYear !== null && lastYear >= nowYear) {
+      status = "Laufend";
+    }
+
+    // Zeitleisten-Position: Epoche(n) und Phase(n), in denen die Filme liegen.
+    const eras = [];
+    const phases = [];
+    movies.forEach((m) => {
+      const era = eraFor(m.title);
+      if (era && eras.indexOf(era.era) === -1) eras.push(era.era);
+      const phase = phaseFor(m.title);
+      if (phase && phases.indexOf(phase) === -1) phases.push(phase);
+    });
+
+    // Verwandte Universen: teilen sich mindestens eine Figur.
+    const ownBaseNames = (universe.characters || []).map((c) => baseName(c.name));
+    const related = [];
+    UNIVERSES.forEach((other) => {
+      if (other.id === universe.id) return;
+      const shared = (other.characters || []).filter((c) => ownBaseNames.indexOf(baseName(c.name)) !== -1);
+      if (shared.length) related.push({ universe: other, shared: shared.length });
+    });
+    related.sort((a, b) => b.shared - a.shared);
+
+    // Verwandte Filme: Filme derselben MCU-Phase aus anderen Universen.
+    const ownTitles = movies.map((m) => m.title);
+    const relatedFilms = [];
+    if (typeof FILM_INFO !== "undefined") {
+      Object.keys(FILM_INFO).forEach((title) => {
+        if (ownTitles.indexOf(title) !== -1) return;
+        if (phases.indexOf(FILM_INFO[title].phase) === -1) return;
+        relatedFilms.push({ title, phase: FILM_INFO[title].phase, desc: FILM_INFO[title].desc });
+      });
+    }
+
+    return {
+      firstYear,
+      lastYear,
+      status,
+      eras,
+      phases,
+      related,
+      relatedFilms: relatedFilms.slice(0, 8),
+      mainFilm: movies.length ? movies[movies.length - 1] : null,
+    };
+  }
+
+  // ---------- Verbindungen zwischen Universen (Multiverse Map) ----------
+  function universeConnections() {
+    const links = [];
+    for (let i = 0; i < UNIVERSES.length; i++) {
+      for (let j = i + 1; j < UNIVERSES.length; j++) {
+        const a = UNIVERSES[i];
+        const b = UNIVERSES[j];
+        const aNames = (a.characters || []).map((c) => baseName(c.name));
+        const sharedNames = (b.characters || [])
+          .map((c) => baseName(c.name))
+          .filter((n) => aNames.indexOf(n) !== -1);
+        const unique = sharedNames.filter((n, idx) => sharedNames.indexOf(n) === idx);
+        if (unique.length) links.push({ a, b, shared: unique.length, names: unique });
+      }
+    }
+    return links;
+  }
+
+  // ---------- Duell-Bewertung ("Wer würde gewinnen?") ----------
+  // Bewusst spielerisch: gewichtete Summe der abgeleiteten Werte, keine
+  // offizielle oder objektive Aussage.
+  const BATTLE_WEIGHTS = {
+    staerke: 1.15,
+    geschwindigkeit: 1.0,
+    intelligenz: 0.85,
+    kampf: 1.2,
+    technologie: 0.9,
+    energie: 1.25,
+    ausdauer: 1.05,
+  };
+
+  function battleScore(character) {
+    const stats = statsFor(character);
+    let sum = 0;
+    let weight = 0;
+    stats.forEach((s) => {
+      const w = BATTLE_WEIGHTS[s.key] || 1;
+      sum += s.value * w;
+      weight += w;
+    });
+    return { stats, score: Math.round(sum / weight) };
+  }
+
+  return {
+    STAT_DEFS,
+    statsFor,
+    relationsFor,
+    findCharacter,
+    baseName,
+    filmInfo,
+    phaseFor,
+    eraFor,
+    universeMeta,
+    universeConnections,
+    battleScore,
+  };
 })();
