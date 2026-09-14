@@ -15,7 +15,7 @@ window.MARVEL_CONFIG = {
   // Adresse des TMDB-Proxys (ohne abschließenden Schrägstrich), z.B.
   // "https://marvel-tmdb.<name>.workers.dev". Solange der Wert leer ist, werden
   // keine TMDB-Anfragen gestellt und überall greifen die generierten Grafiken.
-  tmdbProxyUrl: "",
+  tmdbProxyUrl: "https://restless-base-c561.ahmeteyvaz85.workers.dev",
 
   // Sprache für Titel/Bilder der TMDB-Suche.
   tmdbLanguage: "de-DE",
@@ -25,5 +25,5 @@ window.MARVEL_CONFIG = {
 
   // Auf true setzen, um die Bildsuche Schritt für Schritt in der Browser-Konsole
   // mitzuschreiben (Film-ID, gefundene Besetzung, profile_path, fertige Bild-URL).
-  debugImages: true,
+  debugImages: falsse,
 };
