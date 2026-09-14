@@ -898,6 +898,14 @@ const UNIVERSES = [
       {
         name: "Reed Richards / Mister Fantastic",
         role: "Pedro Pascal",
+        // Porträt kommt aus der Besetzungsliste dieses Films (movie/{id}/credits):
+        // zuerst wird die Rolle gesucht, ersatzweise die Darsteller:in.
+        tmdbCredit: {
+          film: "The Fantastic Four: First Steps",
+          year: 2025,
+          character: "Reed Richards",
+          actor: "Pedro Pascal",
+        },
         alignment: "Held",
         bio: "Brillanter Wissenschaftler und Anführer der Fantastic Four, dessen Körper nach einem kosmischen Strahlungsunfall gummiartig dehnbar wird.",
         powers: ["Körper unendlich dehnbar/verformbar", "Genie-Intellekt"],
@@ -1269,6 +1277,14 @@ const UNIVERSES = [
       {
         name: "Reed Richards / Mister Fantastic",
         role: "Pedro Pascal",
+        // Porträt kommt aus der Besetzungsliste dieses Films (movie/{id}/credits):
+        // zuerst wird die Rolle gesucht, ersatzweise die Darsteller:in.
+        tmdbCredit: {
+          film: "The Fantastic Four: First Steps",
+          year: 2025,
+          character: "Reed Richards",
+          actor: "Pedro Pascal",
+        },
         alignment: "Held",
         bio: "Der geniale Anführer der Fantastic Four, dessen wissenschaftliches Verständnis der Multiversum-Mechanik zum Schlüssel im Kampf gegen Doom werden könnte.",
         powers: ["Körper unendlich dehnbar/verformbar", "Genie-Intellekt"],

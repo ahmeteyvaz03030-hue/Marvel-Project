@@ -67,8 +67,22 @@ window.TMDB = (function () {
     return p;
   }
 
+  // Wiederverwendbarer Helfer: baut aus einem TMDB-Pfad die vollständige Bild-URL.
+  const getTMDBImage = (path, size = "w500") => {
+    if (!path) return null;
+    return `${IMG}/${size}${path}`;
+  };
+
   function imageUrl(filePath, size) {
-    return filePath ? `${IMG}/${size}${filePath}` : null;
+    return getTMDBImage(filePath, size);
+  }
+
+  // Optionale Schritt-für-Schritt-Ausgabe zum Debuggen der Bildsuche
+  // (in config.js mit debugImages: true einschalten).
+  function debug() {
+    if (!CFG.debugImages) return;
+    const args = Array.prototype.slice.call(arguments);
+    console.info.apply(console, ["[TMDB]"].concat(args));
   }
 
   // ---------- Filme ----------
@@ -163,6 +177,68 @@ window.TMDB = (function () {
       });
   }
 
+  // ---------- Besetzung eines Films (movie/{id}/credits) ----------
+  // Sucht in der Besetzung eines Films nach einer Rolle (z.B. "Reed Richards")
+  // und liefert das Porträt der Darsteller:in. Findet sich die Rolle nicht,
+  // wird auf den Namen der Darsteller:in zurückgegriffen.
+  function castPhoto(title, year, characterMatch, actorName, size) {
+    const clean = normalizeTitle(title);
+    if (!enabled() || !clean) return Promise.resolve(null);
+
+    const key = `cast:${clean.toLowerCase()}:${year || ""}:${(characterMatch || actorName || "").toLowerCase()}:${size || "w500"}`;
+    const cached = cacheGet(key);
+    if (cached !== undefined) {
+      debug("Treffer aus Cache für", characterMatch || actorName, "→", cached);
+      return Promise.resolve(cached);
+    }
+
+    return movieImages(title, year)
+      .then((movie) => {
+        if (!movie || !movie.tmdbId) {
+          debug("Kein Film gefunden für", clean, year);
+          return null;
+        }
+        debug("Film-ID für", clean, "=", movie.tmdbId);
+        return request(`/movie/${movie.tmdbId}/credits`, {}).then((credits) => ({ movie, credits }));
+      })
+      .then((data) => {
+        if (!data || !data.credits) return null;
+        const cast = Array.isArray(data.credits.cast) ? data.credits.cast : [];
+        debug("Besetzung geladen:", cast.length, "Einträge");
+
+        const wantedRole = (characterMatch || "").toLowerCase();
+        let member = wantedRole
+          ? cast.find((c) => (c.character || "").toLowerCase().indexOf(wantedRole) !== -1)
+          : null;
+
+        if (!member && actorName) {
+          debug("Rolle nicht gefunden, weiche auf Darsteller:in aus:", actorName);
+          member = cast.find((c) => c.name === actorName);
+          if (!member) {
+            const wantedName = actorName.toLowerCase();
+            member = cast.find((c) => (c.name || "").toLowerCase() === wantedName);
+          }
+        }
+
+        if (!member) {
+          debug("Kein passendes Besetzungsmitglied gefunden");
+          return null;
+        }
+
+        debug("Besetzung gefunden:", member.name, "als", member.character, "| profile_path:", member.profile_path);
+        return getTMDBImage(member.profile_path, size || "w500");
+      })
+      .then((url) => {
+        cacheSet(key, url);
+        debug("Bild-URL:", url);
+        return url;
+      })
+      .catch((err) => {
+        debug("Anfrage fehlgeschlagen:", err && err.message);
+        return null;
+      });
+  }
+
   // ---------- Serien ----------
   function seriesPoster(title, year) {
     const clean = normalizeTitle(title);
@@ -216,11 +292,13 @@ window.TMDB = (function () {
 
   return {
     enabled,
+    getTMDBImage,
     moviePoster,
     movieBackdrop,
     movieImages,
     movieDetails,
     movieLogo,
+    castPhoto,
     seriesPoster,
     personPhoto,
     youtubeThumb,

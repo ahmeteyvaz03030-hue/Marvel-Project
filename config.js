@@ -20,4 +20,8 @@ window.MARVEL_CONFIG = {
 
   // Wie lange geladene Bild-URLs lokal zwischengespeichert werden (Stunden).
   imageCacheHours: 168,
+
+  // Auf true setzen, um die Bildsuche Schritt für Schritt in der Browser-Konsole
+  // mitzuschreiben (Film-ID, gefundene Besetzung, profile_path, fertige Bild-URL).
+  debugImages: false,
 };

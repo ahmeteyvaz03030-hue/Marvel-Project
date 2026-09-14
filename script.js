@@ -2646,18 +2646,49 @@
 
   // ---------- Porträt: echtes Foto, sonst generierte Grafik ----------
   function applyPortrait(el, character, universe) {
+    // Die generierte Grafik steht sofort da und bleibt als Fallback stehen,
+    // falls kein Bild geladen werden kann.
     el.innerHTML = characterVisualHTML(character, universe, getInitials(character.name));
     if (character.image || !window.TMDB || !TMDB.enabled()) return;
 
     const token = modalToken;
-    TMDB.personPhoto(character.role)
+    const credit = character.tmdbCredit;
+
+    // Ist für die Figur ein Filmcredit hinterlegt, wird das Porträt über die
+    // Besetzungsliste dieses Films geholt (genauer als die reine Personensuche).
+    const lookup = credit
+      ? TMDB.castPhoto(credit.film, credit.year, credit.character, credit.actor)
+      : TMDB.personPhoto(character.role);
+
+    lookup
+      .then((url) => {
+        if (!url && credit) {
+          // Kein Treffer über die Besetzung → Personensuche als zweiter Versuch,
+          // bevor die generierte Grafik stehen bleibt.
+          console.warn(
+            `[Porträt] Kein TMDB-Bild über die Besetzung von „${credit.film}“ für ${character.name} — versuche Personensuche.`
+          );
+          return TMDB.personPhoto(credit.actor || character.role);
+        }
+        return url;
+      })
       .then((url) => (url ? preload(url) : null))
       .then((url) => {
-        if (!url || token !== modalToken) return;
-        el.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(character.role)}">`;
+        if (!url) {
+          if (credit) {
+            console.warn(`[Porträt] Für ${character.name} liefert TMDB kein Bild — generierte Grafik bleibt sichtbar.`);
+          }
+          return;
+        }
+        if (token !== modalToken) return;
+        el.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(character.name)}">`;
       })
-      .catch(() => {
-        /* generierte Grafik bleibt stehen */
+      .catch((err) => {
+        // Generierte Grafik bleibt stehen; Ursache wird für die Fehlersuche gemeldet.
+        // Betrifft sowohl fehlgeschlagene TMDB-Anfragen als auch nicht ladbare Bilder.
+        if (credit) {
+          console.warn(`[Porträt] Bild für ${character.name} konnte nicht geladen werden:`, err && err.type ? err.type : err);
+        }
       });
   }
 
