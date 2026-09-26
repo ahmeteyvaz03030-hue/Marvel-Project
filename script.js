@@ -1994,8 +1994,8 @@
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x05060c, 0.0035);
 
-  const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 2000);
-  const DEFAULT_CAM_POS = new THREE.Vector3(0, 16, 58);
+  const camera = new THREE.PerspectiveCamera(49, window.innerWidth / window.innerHeight, 0.1, 2000);
+  const DEFAULT_CAM_POS = new THREE.Vector3(0, 14, 50);
   camera.position.copy(DEFAULT_CAM_POS);
 
   let camTarget = new THREE.Vector3(0, 0, 0);
