@@ -117,6 +117,7 @@
     <button id="compare-btn">⚔️ <span>VERGLEICHEN</span></button>
     <button id="favorites-btn">⭐ <span>FAVORITEN</span></button>
     <button id="travel-btn">🚀 <span>MARVEL TRAVEL</span></button>
+    <button id="discover-btn">🧭 <span>ENTDECKEN</span></button>
     <button id="theories-btn">🔮 <span>THEORIEN</span></button>
     <button id="map-btn">🌌 <span>MULTIVERSE MAP</span></button>
   </div>
@@ -132,6 +133,57 @@
         <button id="travel-mode-release">Kinostart-Reihenfolge</button>
       </div>
       <div id="travel-timeline"></div>
+    </div>
+  </div>
+
+  <div id="discover-overlay" class="hidden">
+    <div id="discover-panel">
+      <button id="discover-close" aria-label="Schließen">✕</button>
+      <div class="panel-eyebrow">MARVEL</div>
+      <h2>Entdecken</h2>
+
+      <div id="discover-tabs">
+        <button id="discover-tab-movies" class="active" data-tab="movies">Filme</button>
+        <button id="discover-tab-series" data-tab="series">Serien</button>
+        <button id="discover-tab-characters" data-tab="characters">Charaktere</button>
+      </div>
+
+      <div id="discover-view-movies" class="discover-view">
+        <div id="discover-toolbar">
+          <div id="discover-search-box">
+            <span id="discover-search-icon">🔍</span>
+            <input id="discover-search" type="text" placeholder="Film suchen…" autocomplete="off">
+          </div>
+          <select id="discover-sort" aria-label="Sortieren nach">
+            <option value="year-asc">Erscheinungsjahr: älteste zuerst</option>
+            <option value="year-desc">Erscheinungsjahr: neueste zuerst</option>
+            <option value="title-asc">Titel A–Z</option>
+          </select>
+        </div>
+
+        <div id="discover-filter-universe" class="discover-filter-row"></div>
+        <div id="discover-filter-phase" class="discover-filter-row hidden"></div>
+
+        <div id="discover-toolbar-foot">
+          <span id="discover-count"></span>
+          <button id="discover-reset" type="button">Filter zurücksetzen</button>
+        </div>
+
+        <div id="discover-grid" class="film-grid"></div>
+        <p id="discover-empty" class="travel-sub hidden">Keine Filme gefunden.</p>
+      </div>
+
+      <div id="discover-view-series" class="discover-view hidden">
+        <div id="discover-series-grid" class="film-grid"></div>
+      </div>
+
+      <div id="discover-view-characters" class="discover-view hidden">
+        <div id="discover-search-box">
+          <span id="discover-search-icon">🔍</span>
+          <input id="discover-char-search" type="text" placeholder="Charakter suchen…" autocomplete="off">
+        </div>
+        <div id="discover-characters-grid" class="discover-character-grid"></div>
+      </div>
     </div>
   </div>
 

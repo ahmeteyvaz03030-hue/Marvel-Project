@@ -165,6 +165,7 @@
 
   const BLOCKING_OVERLAY_IDS = [
     "travel-overlay",
+    "discover-overlay",
     "favorites-overlay",
     "compare-overlay",
     "theories-overlay",
@@ -785,6 +786,289 @@
     closeBtn.addEventListener("click", () => closeOverlay(overlay));
   }
   initTravel();
+
+  // ---------- Entdecken (Film-/Serien-/Charakter-Bibliothek) ----------
+  // Baut auf denselben Funktionen wie Marvel Travel & die Suche auf:
+  // openFilmModal für den Filmklick, loadPosterInto/TMDB.seriesPoster für
+  // Poster, SEARCH_INDEX/openCharacterModal für Charaktere. Keine zweite
+  // TMDB-Anbindung, keine neue Filmdatenbank — nur MarvelDerive.allFilms().
+  function initDiscover() {
+    const btn = document.getElementById("discover-btn");
+    const overlay = document.getElementById("discover-overlay");
+    const closeBtn = document.getElementById("discover-close");
+    const tabButtons = Array.prototype.slice.call(document.querySelectorAll("#discover-tabs button"));
+    const views = {
+      movies: document.getElementById("discover-view-movies"),
+      series: document.getElementById("discover-view-series"),
+      characters: document.getElementById("discover-view-characters"),
+    };
+
+    // Kurze Anzeigenamen für die Universum-Filter-Chips (nur Beschriftung —
+    // welche Universen überhaupt als Chip erscheinen, ergibt sich unten rein
+    // aus den tatsächlich vorhandenen Filmen).
+    const UNIVERSE_LABELS = {
+      mcu: "MCU",
+      xmen: "X-Men",
+      tobey: "Raimi",
+      garfield: "Amazing Spider-Man",
+      fantasticfour: "Fantastic Four",
+    };
+    const UNIVERSE_ORDER = ["mcu", "xmen", "tobey", "garfield", "fantasticfour"];
+
+    function labelFor(f) {
+      return UNIVERSE_LABELS[f.universeId] || f.universeName;
+    }
+
+    const films = MarvelDerive.allFilms();
+
+    const universeIds = [];
+    films.forEach((f) => {
+      if (universeIds.indexOf(f.universeId) === -1) universeIds.push(f.universeId);
+    });
+    universeIds.sort((a, b) => {
+      const ia = UNIVERSE_ORDER.indexOf(a);
+      const ib = UNIVERSE_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
+    const phases = [];
+    films.forEach((f) => {
+      if (f.universeId === "mcu" && f.phase && phases.indexOf(f.phase) === -1) phases.push(f.phase);
+    });
+
+    // ---------- Filme-Tab ----------
+    const movieState = { query: "", universe: "all", phase: "all", sort: "year-asc" };
+    let moviesBuilt = false;
+    const movieCards = new Map(); // key -> Karten-Element (wird nie neu erzeugt, nur verschoben/versteckt)
+
+    function buildMovieGrid() {
+      if (moviesBuilt) return;
+      moviesBuilt = true;
+      const grid = document.getElementById("discover-grid");
+      films.forEach((f) => {
+        const tag =
+          f.universeId === "mcu"
+            ? f.phase
+              ? `<span class="film-universe-tag">${f.phase}</span>`
+              : ""
+            : `<span class="film-universe-tag">${labelFor(f)}</span>`;
+        const card = document.createElement("div");
+        card.className = "film-card";
+        card.innerHTML = `
+          <div class="film-poster"><span class="film-abbrev">${posterAbbrev(f.title)}</span></div>
+          <div class="film-meta">
+            <span class="film-title">${f.title}</span>
+            <span class="film-year">${f.year}</span>
+            ${tag}
+          </div>`;
+        card.addEventListener("click", () => openFilmModal(f.title, f.year));
+        grid.appendChild(card);
+        // Reuse dieselbe Poster-/Cache-Logik wie Marvel Travel & Filmgrids.
+        loadPosterInto(card.querySelector(".film-poster"), f.title, f.year);
+        movieCards.set(f.key, card);
+      });
+    }
+
+    function buildUniverseFilters() {
+      const row = document.getElementById("discover-filter-universe");
+      const items = [{ id: "all", label: "Alle" }].concat(universeIds.map((id) => ({ id, label: UNIVERSE_LABELS[id] || id })));
+      row.innerHTML = "";
+      items.forEach((item) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "discover-chip" + (movieState.universe === item.id ? " active" : "");
+        chip.textContent = item.label;
+        chip.addEventListener("click", () => {
+          movieState.universe = item.id;
+          if (item.id !== "mcu" && item.id !== "all") movieState.phase = "all";
+          renderMovieFilters();
+          renderMovies();
+          Sound.playClick();
+        });
+        row.appendChild(chip);
+      });
+    }
+
+    function buildPhaseFilters() {
+      const row = document.getElementById("discover-filter-phase");
+      const items = [{ id: "all", label: "Alle" }].concat(phases.map((p) => ({ id: p, label: p })));
+      row.innerHTML = "";
+      items.forEach((item) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "discover-chip" + (movieState.phase === item.id ? " active" : "");
+        chip.textContent = item.label;
+        chip.addEventListener("click", () => {
+          movieState.phase = item.id;
+          buildPhaseFilters();
+          renderMovies();
+          Sound.playClick();
+        });
+        row.appendChild(chip);
+      });
+    }
+
+    function renderMovieFilters() {
+      buildUniverseFilters();
+      const phaseRow = document.getElementById("discover-filter-phase");
+      const showPhases = phases.length > 0 && (movieState.universe === "all" || movieState.universe === "mcu");
+      phaseRow.classList.toggle("hidden", !showPhases);
+      if (showPhases) buildPhaseFilters();
+    }
+
+    function sortFilms(list) {
+      const arr = list.slice();
+      if (movieState.sort === "year-desc") arr.sort((a, b) => b.year - a.year || a.title.localeCompare(b.title, "de"));
+      else if (movieState.sort === "title-asc") arr.sort((a, b) => a.title.localeCompare(b.title, "de"));
+      else arr.sort((a, b) => a.year - b.year || a.title.localeCompare(b.title, "de"));
+      return arr;
+    }
+
+    function filterFilms() {
+      const q = movieState.query.trim().toLowerCase();
+      return films.filter((f) => {
+        if (movieState.universe !== "all" && f.universeId !== movieState.universe) return false;
+        if (movieState.phase !== "all" && f.phase !== movieState.phase) return false;
+        if (q && f.title.toLowerCase().indexOf(q) === -1) return false;
+        return true;
+      });
+    }
+
+    // Sortiert/filtert nur die einmalig gebauten Karten neu (verschiebt
+    // bestehende DOM-Knoten statt sie neu zu erzeugen) — Poster werden dabei
+    // nie erneut nachgeladen oder erneut bei TMDB gesucht.
+    function renderMovies() {
+      buildMovieGrid();
+      const grid = document.getElementById("discover-grid");
+      const empty = document.getElementById("discover-empty");
+      const count = document.getElementById("discover-count");
+      const list = sortFilms(filterFilms());
+      const visible = new Set(list.map((f) => f.key));
+      list.forEach((f) => {
+        const card = movieCards.get(f.key);
+        if (card) grid.appendChild(card);
+      });
+      movieCards.forEach((card, key) => card.classList.toggle("hidden", !visible.has(key)));
+      empty.classList.toggle("hidden", list.length > 0);
+      count.textContent = `${list.length} Film${list.length === 1 ? "" : "e"}`;
+    }
+
+    document.getElementById("discover-search").addEventListener("input", (e) => {
+      movieState.query = e.target.value;
+      renderMovies();
+    });
+    document.getElementById("discover-sort").addEventListener("change", (e) => {
+      movieState.sort = e.target.value;
+      renderMovies();
+    });
+    document.getElementById("discover-reset").addEventListener("click", () => {
+      movieState.query = "";
+      movieState.universe = "all";
+      movieState.phase = "all";
+      movieState.sort = "year-asc";
+      document.getElementById("discover-search").value = "";
+      document.getElementById("discover-sort").value = "year-asc";
+      renderMovieFilters();
+      renderMovies();
+      Sound.playClick();
+    });
+
+    renderMovieFilters();
+
+    // ---------- Serien-Tab (bestehende TMDB.seriesPoster-Anbindung aus der Suche) ----------
+    let seriesBuilt = false;
+    function buildSeriesGrid() {
+      if (seriesBuilt) return;
+      seriesBuilt = true;
+      const grid = document.getElementById("discover-series-grid");
+      (typeof SERIES !== "undefined" ? SERIES : []).forEach((sr) => {
+        const card = document.createElement("div");
+        card.className = "film-card";
+        card.innerHTML = `
+          <div class="film-poster"><span class="film-abbrev">${posterAbbrev(sr.title)}</span></div>
+          <div class="film-meta">
+            <span class="film-title">${sr.title}</span>
+            <span class="film-year">${sr.year}${sr.phase ? " · " + sr.phase : ""}</span>
+          </div>`;
+        card.addEventListener("click", () => showToast(`📺 ${sr.title} (${sr.year}) — ${sr.desc}`, 5200));
+        grid.appendChild(card);
+        if (window.TMDB && TMDB.enabled()) {
+          const posterEl = card.querySelector(".film-poster");
+          TMDB.seriesPoster(sr.title, sr.year)
+            .then((url) => (url ? preload(url) : null))
+            .then((url) => {
+              if (url && posterEl.isConnected) {
+                posterEl.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(sr.title)}" loading="lazy">`;
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }
+
+    // ---------- Charaktere-Tab (bestehender SEARCH_INDEX + openCharacterModal) ----------
+    let charsBuilt = false;
+    function buildCharactersGrid() {
+      if (charsBuilt) return;
+      charsBuilt = true;
+      const grid = document.getElementById("discover-characters-grid");
+      SEARCH_INDEX.filter((m) => m.type === "character").forEach((entry) => {
+        const c = entry.character;
+        const u = entry.universe;
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "discover-character-card";
+        card.style.setProperty("--accent-color", u.accent);
+        card.innerHTML = `
+          <span class="discover-character-avatar">${characterFigureSVG(u.accent, getInitials(c.name))}</span>
+          <span class="discover-character-name">${c.name.split(" / ")[0]}</span>
+          <span class="discover-character-sub">${u.name}</span>`;
+        card.addEventListener("click", () => {
+          closeOverlay(overlay);
+          selectUniverse(u.id);
+          setTimeout(() => openCharacterModal(c, u), 300);
+        });
+        grid.appendChild(card);
+        loadPersonInto(card.querySelector(".discover-character-avatar"), c);
+      });
+    }
+
+    document.getElementById("discover-char-search").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      const grid = document.getElementById("discover-characters-grid");
+      Array.prototype.forEach.call(grid.children, (card) => {
+        const name = card.querySelector(".discover-character-name").textContent.toLowerCase();
+        card.classList.toggle("hidden", Boolean(q) && name.indexOf(q) === -1);
+      });
+    });
+
+    // ---------- Tabs ----------
+    function activateTab(tab) {
+      tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      Object.keys(views).forEach((key) => views[key].classList.toggle("hidden", key !== tab));
+      if (tab === "movies") renderMovies();
+      else if (tab === "series") buildSeriesGrid();
+      else if (tab === "characters") buildCharactersGrid();
+    }
+
+    tabButtons.forEach((b) => {
+      b.addEventListener("click", () => {
+        activateTab(b.dataset.tab);
+        Sound.playClick();
+      });
+    });
+
+    btn.addEventListener("click", () => {
+      openOverlay(overlay);
+      renderMovies();
+      Sound.playClick();
+    });
+    closeBtn.addEventListener("click", () => closeOverlay(overlay));
+  }
+  initDiscover();
 
   // ---------- J.A.R.V.I.S. (Befehls-Assistent) ----------
   // Die Befehle werden lokal ausgewertet. Die Struktur ist bewusst als Liste von

@@ -236,6 +236,67 @@ window.MarvelDerive = (function () {
     return null;
   }
 
+  // Entfernt einen abschließenden Klammerzusatz wie " (Cameo)" oder " (Ursprung)",
+  // der in manchen Universum-Filmlisten nur eine Notiz ist, nicht Teil des
+  // echten Filmtitels (den z.B. TMDB kennt).
+  function stripFilmAnnotation(title) {
+    return String(title || "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  }
+
+  // ---------- Entdecken: deduplizierte Gesamtliste aller Filme ----------
+  // Führt MCU_TIMELINE (die vollständige, korrekt datierte MCU-Liste) und die
+  // "movies"-Listen aller UNIVERSES zusammen. Filme, die in mehreren Listen
+  // auftauchen (z.B. ein MCU-Film, der auch in einem Charakter-Universum als
+  // "movies"-Eintrag steht), werden anhand von Titel+Jahr genau einmal
+  // übernommen. Keine der Ausgangslisten wird verändert oder dupliziert
+  // gepflegt — die Funktion liest nur, was ohnehin in data.js steht.
+  let filmsCache = null;
+  function allFilms() {
+    if (filmsCache) return filmsCache;
+    const seen = new Set();
+    const films = [];
+
+    if (typeof MCU_TIMELINE !== "undefined") {
+      MCU_TIMELINE.forEach((group) => {
+        group.films.forEach((f) => {
+          const key = `${f.title.toLowerCase()}|${f.year}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          films.push({
+            key,
+            title: f.title,
+            year: f.year,
+            universeId: "mcu",
+            universeName: "MCU",
+            phase: group.phase || "",
+          });
+        });
+      });
+    }
+
+    if (typeof UNIVERSES !== "undefined") {
+      UNIVERSES.forEach((u) => {
+        (u.movies || []).forEach((m) => {
+          const title = stripFilmAnnotation(m.title);
+          const key = `${title.toLowerCase()}|${m.year}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          films.push({
+            key,
+            title,
+            year: m.year,
+            universeId: u.id,
+            universeName: u.name,
+            phase: "",
+          });
+        });
+      });
+    }
+
+    filmsCache = films;
+    return films;
+  }
+
   // Echtes Kinostart-Jahr eines Films (aus der Kinostart-Zeitleiste), unabhängig
   // vom im Handlungs-Modus angezeigten Handlungsjahr. Wird für die TMDB-Suche
   // gebraucht, da die Handlungsjahre (z.B. 1942 bei Captain America) keine
@@ -360,6 +421,7 @@ window.MarvelDerive = (function () {
     phaseFor,
     eraFor,
     releaseYearFor,
+    allFilms,
     universeMeta,
     universeConnections,
     battleScore,
