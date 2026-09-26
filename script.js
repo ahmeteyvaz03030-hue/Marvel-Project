@@ -687,6 +687,11 @@
           const info = MarvelDerive.filmInfo(f.title);
           const phase = info ? info.phase : "";
           const desc = info ? info.desc : "";
+          // Handlungsjahr (Anzeige) kann vom echten Kinostart-Jahr abweichen
+          // (z.B. Captain America: The First Avenger spielt 1942, kam aber 2011
+          // ins Kino) — für die TMDB-Suche wird deshalb immer das echte
+          // Kinostart-Jahr verwendet, sonst findet TMDB keinen Treffer.
+          const tmdbYear = MarvelDerive.releaseYearFor(f.title) || f.year;
 
           const item = document.createElement("div");
           item.className =
@@ -704,14 +709,14 @@
           container.appendChild(item);
 
           // Echtes Poster nachladen, Kürzel bleibt als Fallback stehen.
-          loadPosterInto(item.querySelector(".mcu-poster"), f.title, f.year);
+          loadPosterInto(item.querySelector(".mcu-poster"), f.title, tmdbYear);
 
           // Beim Überfahren erscheint das Szenenbild des Films dezent im Hintergrund.
           let backdropLoaded = false;
           item.addEventListener("pointerenter", () => {
             if (backdropLoaded || !window.TMDB || !TMDB.enabled()) return;
             backdropLoaded = true;
-            TMDB.movieBackdrop(f.title, f.year)
+            TMDB.movieBackdrop(f.title, tmdbYear)
               .then((url) => (url ? preload(url) : null))
               .then((url) => {
                 if (url) item.style.setProperty("--item-backdrop", `url("${url}")`);
@@ -719,7 +724,7 @@
               .catch(() => {});
           });
 
-          item.addEventListener("click", () => openFilmModal(f.title, f.year));
+          item.addEventListener("click", () => openFilmModal(f.title, f.year, tmdbYear));
           side = 1 - side;
         });
       });
@@ -3273,10 +3278,14 @@
   // ---------- Film-Detailansicht ----------
   let filmToken = 0;
 
-  function openFilmModal(title, year) {
+  function openFilmModal(title, year, lookupYear) {
     Sound.playClick();
     filmToken++;
     const token = filmToken;
+    // TMDB-Suche nutzt bevorzugt das echte Kinostart-Jahr (lookupYear); die
+    // Anzeige des übergebenen "year" (z.B. Handlungsjahr in Marvel Travel)
+    // bleibt davon unberührt.
+    const tmdbYear = lookupYear || year;
 
     const info = MarvelDerive.filmInfo(title);
     const era = MarvelDerive.eraFor(title);
@@ -3312,14 +3321,14 @@
     // Poster + Backdrop dynamisch, Kürzel/Verlauf als Fallback
     const posterEl = document.getElementById("film-poster");
     posterEl.innerHTML = `<span class="film-abbrev">${posterAbbrev(title)}</span>`;
-    loadPosterInto(posterEl, title, year);
+    loadPosterInto(posterEl, title, tmdbYear);
 
     const bg = document.getElementById("film-hero-bg");
     bg.classList.remove("loaded");
     bg.classList.add("fallback");
     bg.style.backgroundImage = "";
     if (window.TMDB && TMDB.enabled()) {
-      TMDB.movieBackdrop(title, year)
+      TMDB.movieBackdrop(title, tmdbYear)
         .then((url) => (url ? preload(url) : null))
         .then((url) => {
           if (!url || token !== filmToken) return;
@@ -3330,7 +3339,7 @@
         .catch(() => {});
 
       // Ausführlichere Beschreibung, falls die API eine liefert
-      TMDB.movieDetails(title, year)
+      TMDB.movieDetails(title, tmdbYear)
         .then((details) => {
           if (!details || !details.overview || token !== filmToken) return;
           document.getElementById("film-desc").textContent = details.overview;

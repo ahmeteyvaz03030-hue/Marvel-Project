@@ -236,6 +236,19 @@ window.MarvelDerive = (function () {
     return null;
   }
 
+  // Echtes Kinostart-Jahr eines Films (aus der Kinostart-Zeitleiste), unabhängig
+  // vom im Handlungs-Modus angezeigten Handlungsjahr. Wird für die TMDB-Suche
+  // gebraucht, da die Handlungsjahre (z.B. 1942 bei Captain America) keine
+  // echten Kinostart-Jahre sind und TMDB sonst keinen Treffer findet.
+  function releaseYearFor(title) {
+    if (typeof MCU_TIMELINE === "undefined") return null;
+    for (let i = 0; i < MCU_TIMELINE.length; i++) {
+      const film = MCU_TIMELINE[i].films.find((f) => f.title === title);
+      if (film) return film.year;
+    }
+    return null;
+  }
+
   // Status eines Universums aus den Erscheinungsjahren seiner Filme ableiten.
   function universeMeta(universe) {
     const movies = universe.movies || [];
@@ -346,6 +359,7 @@ window.MarvelDerive = (function () {
     filmInfo,
     phaseFor,
     eraFor,
+    releaseYearFor,
     universeMeta,
     universeConnections,
     battleScore,
