@@ -78,64 +78,80 @@ html, body {
   pointer-events: none;
 }
 
+/* Planeten-Beschriftung: Symbol-Badge + Namens-Pill, seitlich über dem Planeten.
+   Die Position setzt script.js per transform (links oben verankert). */
 .planet-label {
   position: absolute;
-  transform: translate(-50%, -50%);
+  left: 0;
+  top: 0;
   pointer-events: auto;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
   user-select: none;
+  will-change: transform;
 }
 
 .planet-label .dot {
-  width: 8px;
-  height: 8px;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--dot-color, #fff);
-  box-shadow: 0 0 10px 2px var(--dot-color, #fff);
-  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dot-color, #fff);
+  background: radial-gradient(circle at 50% 40%, rgba(22, 26, 44, 0.95), rgba(5, 6, 14, 0.95));
+  border: 1.5px solid color-mix(in srgb, var(--dot-color, #fff) 75%, transparent);
+  box-shadow: 0 0 14px -2px var(--dot-color, #fff), inset 0 0 10px rgba(255, 255, 255, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.planet-label .dot svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--dot-color, #fff) 70%, transparent));
 }
 
 .planet-label .name {
+  margin-left: -12px;
+  padding: 7px 16px 7px 20px;
   font-family: var(--font-display);
   font-size: 12px;
-  letter-spacing: 1.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   color: #fff;
-  background: rgba(6, 7, 16, 0.55);
-  padding: 4px 10px;
-  border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(90deg, rgba(8, 10, 22, 0.86), rgba(10, 12, 26, 0.62));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: none;
+  border-radius: 0 18px 18px 0;
   white-space: nowrap;
-  backdrop-filter: blur(4px);
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .planet-label:hover .dot,
+.planet-label.hovered .dot,
 .planet-label.active .dot {
-  transform: scale(1.6);
+  transform: scale(1.1);
+  box-shadow: 0 0 22px 0 var(--dot-color, #fff), inset 0 0 10px rgba(255, 255, 255, 0.08);
 }
 
 .planet-label:hover .name,
 .planet-label.hovered .name,
 .planet-label.active .name {
-  border-color: var(--dot-color, #fff);
-  background: rgba(6, 7, 16, 0.85);
-  transform: translateY(-2px);
-}
-
-/* Der Planet unter dem Mauszeiger hebt auch sein Label hervor */
-.planet-label.hovered .dot {
-  transform: scale(1.45);
-  box-shadow: 0 0 16px 4px var(--dot-color, #fff);
+  border-color: color-mix(in srgb, var(--dot-color, #fff) 70%, transparent);
+  background: linear-gradient(90deg, rgba(8, 10, 22, 0.94), rgba(14, 16, 32, 0.8));
 }
 
 .planet-label.doomsday .name {
-  color: #ff6a4d;
-  font-weight: 700;
+  color: #ffd2c4;
 }
 
 #hint {
@@ -2237,7 +2253,9 @@ html, body {
   .more-hud-btn { padding: 7px 10px; font-size: 9px; }
   #more-hud-tag { display: none; }
 
-  .planet-label .name { font-size: 10.5px; padding: 3px 8px; }
+  .planet-label .dot { width: 26px; height: 26px; }
+  .planet-label .dot svg { width: 15px; height: 15px; }
+  .planet-label .name { font-size: 9.5px; letter-spacing: 1px; padding: 5px 11px 5px 16px; margin-left: -10px; }
 
   /* Panel-Inhalt beginnt unterhalb der Suchleiste/Steine-Anzeige statt darunter versteckt zu sein */
   #panel { padding-top: 66px; }
@@ -2297,6 +2315,10 @@ html, body {
   .command-btn-main { padding: 7px 14px; font-size: 10px; }
 
   #more-hud { display: none; }
+
+  .planet-label .dot { width: 24px; height: 24px; }
+  .planet-label .dot svg { width: 14px; height: 14px; }
+  .planet-label .name { font-size: 8.5px; letter-spacing: 0.8px; padding: 4px 9px 4px 14px; margin-left: -10px; }
 
   #panel { padding-top: 54px; }
   #panel-close { top: 44px; right: 14px; z-index: 12; }
@@ -3301,6 +3323,12 @@ body.stone-surge #scene { animation: stoneSurge 2.4s ease; }
   #map-panel { width: min(1080px, 100%); }
   #travel-panel { width: min(980px, 100%); }
   .film-grid { grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); }
+}
+
+/* Schmale Desktop-/Laptop-Breiten: Suche etwas schmaler, damit sie den
+   zentrierten Titel nicht berührt. */
+@media (min-width: 1101px) and (max-width: 1440px) {
+  #search-wrap { width: 240px; }
 }
 
 /* ---------- Tablets und schmale Laptops ---------- */
