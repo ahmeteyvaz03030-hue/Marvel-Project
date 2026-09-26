@@ -2446,7 +2446,7 @@
       rim: 0.95,
       halo: { color: "#3aa8ff", scale: 4.2, opacity: 0.42 },
       clouds: 0.45,
-      moon: { size: 0.19, dist: 1.85, speed: 0.22, tilt: 0.3 },
+      moon: { size: 0.19, dist: 1.7, speed: 0.22, tilt: -0.95 },
       spin: 0.06,
       labelColor: "#4fb4ff",
     },
@@ -2561,7 +2561,7 @@
       rim: 1.0,
       halo: { color: "#ff3a1a", scale: 4.9, opacity: 0.58 },
       clouds: 0.4,
-      moon: { size: 0.15, dist: 1.8, speed: -0.18, tilt: -0.2 },
+      moon: { size: 0.15, dist: 1.5, speed: -0.18, tilt: 0.95 },
       spin: 0.045,
       labelColor: "#ff3b2a",
     },
@@ -2599,7 +2599,7 @@
       rim: 0.95,
       halo: { color: "#4a8cff", scale: 4.2, opacity: 0.36 },
       clouds: 0.85,
-      moon: { size: 0.21, dist: 2.1, speed: 0.15, tilt: 0.45 },
+      moon: { size: 0.21, dist: 1.7, speed: 0.15, tilt: 0.7 },
       spin: 0.07,
       labelColor: "#5a9bff",
     },
@@ -3330,16 +3330,20 @@
   // liegen nah an der Kamera, kleinere weiter hinten. "wide" gilt für
   // Querformat, "tall" für Hochformat; dazwischen wird weich überblendet.
   const PLANET_LAYOUT = {
-    xmen: { wide: [-0.7, 0.34, 0.225], tall: [-0.55, 0.5, 0.11], d: 36 },
-    titan: { wide: [-0.36, 0.47, 0.13], tall: [0.1, 0.6, 0.07], d: 72 },
+    xmen: { wide: [-0.72, 0.36, 0.225], tall: [-0.55, 0.5, 0.11], d: 36 },
+    titan: { wide: [-0.34, 0.5, 0.13], tall: [0.1, 0.6, 0.07], d: 72 },
     holland: { wide: [0.12, 0.36, 0.1], tall: [0.55, 0.28, 0.06], d: 82 },
-    thunderbolts: { wide: [0.52, 0.44, 0.11], tall: [0.62, 0.48, 0.07], d: 90 },
-    doomsday: { wide: [0.8, 0.05, 0.29], tall: [0.6, -0.1, 0.13], d: 30 },
-    garfield: { wide: [-0.4, -0.1, 0.175], tall: [-0.6, 0.02, 0.09], d: 44 },
-    tobey: { wide: [0.28, -0.11, 0.11], tall: [0.12, -0.22, 0.065], d: 60 },
-    fantasticfour: { wide: [0.13, -0.42, 0.24], tall: [-0.08, -0.42, 0.11], d: 26 },
-    avengers: { wide: [-0.79, -0.4, 0.2], tall: [-0.62, -0.36, 0.095], d: 32 },
+    thunderbolts: { wide: [0.46, 0.5, 0.11], tall: [0.62, 0.48, 0.07], d: 90 },
+    doomsday: { wide: [0.76, 0.04, 0.29], tall: [0.6, -0.1, 0.13], d: 30 },
+    garfield: { wide: [-0.33, -0.04, 0.175], tall: [-0.6, 0.02, 0.09], d: 44 },
+    tobey: { wide: [0.27, -0.065, 0.11], tall: [0.06, -0.2, 0.065], d: 60 },
+    fantasticfour: { wide: [0.15, -0.5, 0.24], tall: [0.06, -0.53, 0.11], d: 26 },
+    avengers: { wide: [-0.76, -0.5, 0.2], tall: [-0.62, -0.38, 0.095], d: 32 },
   };
+  // Drift entlang der Umlaufbahn (Anteil des Planetenradius) und Mindestabstand
+  // der Planeten zum Bildschirmrand in Pixeln.
+  const PLANET_DRIFT = 0.3;
+  const EDGE_MARGIN_PX = 18;
   const FALLBACK_LAYOUT = { wide: [0, 0.68, 0.08], tall: [0, 0.66, 0.06], d: 95 };
   const DOOM_LAYOUT = { wide: [-0.58, 0.74], tall: [-0.66, 0.27], d: 125 };
   const STONE_LAYOUT = {
@@ -3358,10 +3362,47 @@
   const _lu = new THREE.Vector3();
   const _ld = new THREE.Vector3();
 
+  // Ab 16:10 gilt die volle Querformat-Komposition; schmalere Querformate
+  // (4:3, 5:4) mischen etwas vom Hochformat bei, damit nichts gedrängt wirkt.
   function layoutBlend(aspect) {
-    const t = Math.min(1, Math.max(0, (aspect - 0.62) / (1.3 - 0.62)));
+    const t = Math.min(1, Math.max(0, (aspect - 0.62) / (1.6 - 0.62)));
     return t * t * (3 - 2 * t);
   }
+
+  // Wie weit ein Planet samt Atmosphäre, Mond bzw. Ring über seinen Radius
+  // hinausreicht (horizontal / vertikal, in Planetenradien).
+  function planetReach(look) {
+    let rx = 1.14;
+    let ry = 1.14;
+    if (look.moon) {
+      const tilt = look.moon.tilt || 0;
+      rx = Math.max(rx, look.moon.dist * Math.cos(tilt) + look.moon.size);
+      ry = Math.max(ry, look.moon.dist * Math.abs(Math.sin(tilt)) + look.moon.size);
+    }
+    if (look.ring) rx = Math.max(rx, look.ring.outer * Math.cos(look.ring.tilt[1]));
+    return { x: rx, y: ry };
+  }
+
+  // Hält die Bildschirmposition so weit vom Rand weg, dass der Planet inklusive
+  // Atmosphäre, Drift und Mond/Ring immer vollständig sichtbar bleibt.
+  function fitInView(p, x, y, size, aspect, tanV, tanH) {
+    const reach = planetReach(p.look);
+    const margin = EDGE_MARGIN_PX / (window.innerHeight / 2);
+    for (let i = 0; i < 3; i++) {
+      // Perspektivische Streckung zum Bildrand hin
+      const sec = Math.sqrt(1 + (x * tanH) * (x * tanH) + (y * tanV) * (y * tanV));
+      const ex = size * (reach.x * sec + PLANET_DRIFT);
+      const ey = size * (reach.y * sec + 0.1);
+      const maxX = Math.max(0, (aspect - margin - ex) / aspect);
+      const maxY = Math.max(0, 1 - margin - ey);
+      x = Math.min(maxX, Math.max(-maxX, x));
+      y = Math.min(maxY, Math.max(-maxY, y));
+    }
+    _fit.x = x;
+    _fit.y = y;
+    return _fit;
+  }
+  const _fit = { x: 0, y: 0 };
 
   // Tablets im Hochformat haben unten mehr Platz als Smartphones: dort wird die
   // Hochformat-Komposition etwas gestreckt und vergrößert.
@@ -3370,12 +3411,22 @@
 
   // Liefert die Weltposition zu einem Bildschirmpunkt in Abstand d und gibt
   // die Tiefe entlang der Blickrichtung zurück (für die Größenberechnung).
-  function placeFromScreen(entry, t, tanV, tanH, out) {
-    const x = entry.tall[0] + (entry.wide[0] - entry.tall[0]) * t;
-    const y = entry.tall[1] * tallStretch + (entry.wide[1] - entry.tall[1] * tallStretch) * t;
+  function screenPos(entry, t) {
+    _sp.x = entry.tall[0] + (entry.wide[0] - entry.tall[0]) * t;
+    _sp.y = entry.tall[1] * tallStretch + (entry.wide[1] - entry.tall[1] * tallStretch) * t;
+    return _sp;
+  }
+  const _sp = { x: 0, y: 0 };
+
+  function placeAt(x, y, d, tanV, tanH, out) {
     _ld.copy(_lf).addScaledVector(_lr, x * tanH).addScaledVector(_lu, y * tanV).normalize();
-    out.copy(DEFAULT_CAM_POS).addScaledVector(_ld, entry.d);
-    return entry.d * _ld.dot(_lf);
+    out.copy(DEFAULT_CAM_POS).addScaledVector(_ld, d);
+    return d * _ld.dot(_lf);
+  }
+
+  function placeFromScreen(entry, t, tanV, tanH, out) {
+    const s = screenPos(entry, t);
+    return placeAt(s.x, s.y, entry.d, tanV, tanH, out);
   }
 
   function applyLayout(initial) {
@@ -3394,12 +3445,14 @@
 
     planetObjects.forEach((p) => {
       const entry = PLANET_LAYOUT[p.data.id] || FALLBACK_LAYOUT;
-      const depth = placeFromScreen(entry, t, tanV, tanH, p.anchorTarget);
       const size = entry.tall[2] * tallGrow + (entry.wide[2] - entry.tall[2] * tallGrow) * t;
+      const s = screenPos(entry, t);
+      const f = fitInView(p, s.x, s.y, size, aspect, tanV, tanH);
+      const depth = placeAt(f.x, f.y, entry.d, tanV, tanH, p.anchorTarget);
       p.radiusTarget = size * tanV * depth;
       // Drift entlang der Umlaufrichtung um den Stern
       p.tangent.set(p.anchorTarget.z, 0, -p.anchorTarget.x).normalize();
-      p.driftAmp = p.radiusTarget * 0.45;
+      p.driftAmp = p.radiusTarget * PLANET_DRIFT;
       if (initial) {
         p.anchor.copy(p.anchorTarget);
         p.radius = p.radiusTarget;
@@ -3455,6 +3508,7 @@
     el.style.setProperty("--dot-color", p.look.labelColor || p.look.atmo || p.data.accent);
     const icon = LABEL_ICONS[LABEL_ICON_FOR[p.data.id]] || "";
     el.innerHTML = `<div class="dot">${icon}</div><div class="name">${p.data.name}</div>`;
+    el.dataset.id = p.data.id;
     el.addEventListener("click", () => selectUniverse(p.data.id));
     labelsLayer.appendChild(el);
     labelEls[p.data.id] = el;
@@ -3473,6 +3527,17 @@
   }
   measureLabels();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureLabels);
+  // Ändert sich die Label-Breite später (z.B. Webfont lädt nach), wird neu
+  // gemessen, damit die Randbegrenzung immer mit der echten Breite rechnet.
+  if (window.ResizeObserver) {
+    const labelObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        const el = entry.target;
+        if (el.offsetWidth) labelSize[el.dataset.id] = { w: el.offsetWidth, h: el.offsetHeight };
+      });
+    });
+    Object.values(labelEls).forEach((el) => labelObserver.observe(el));
+  }
 
   // ---------- Raycast click on planets ----------
   // Klick wird erst bei pointerup mit geringer Bewegung ausgelöst, damit ein
@@ -4675,6 +4740,24 @@
   const _lp = new THREE.Vector3();
   const _lv = new THREE.Vector3();
   const labelItems = [];
+  const labelDisks = [];
+  const LABEL_EDGE = 12; // Mindestabstand der Labels zum Bildschirmrand (px)
+
+  // Wie stark ein Label an Position x andere Planetenscheiben verdeckt (px).
+  function labelCover(it, x) {
+    let cover = 0;
+    const top = it.y - it.h / 2;
+    for (let i = 0; i < labelDisks.length; i++) {
+      const d = labelDisks[i];
+      if (d.el === it.el) continue;
+      const nx = Math.max(x, Math.min(d.x, x + it.w));
+      const ny = Math.max(top, Math.min(d.y, top + it.h));
+      const pen = d.r - Math.hypot(nx - d.x, ny - d.y);
+      if (pen > 0) cover += pen;
+    }
+    return cover;
+  }
+
   function updateLabels() {
     const W = window.innerWidth;
     const H = window.innerHeight;
@@ -4683,6 +4766,7 @@
     const topLimit = narrow ? 128 : 100;
     const bottomLimit = H - (narrow ? 158 : 116);
     labelItems.length = 0;
+    labelDisks.length = 0;
 
     planetObjects.forEach((p) => {
       const el = labelEls[p.data.id];
@@ -4704,13 +4788,28 @@
         return;
       }
       const size = labelSize[p.data.id] || { w: 160, h: 30 };
-      labelItems.push({ el, x: sx - Math.min(projR * 0.5, 46) - 15, y: sy, w: size.w, h: size.h });
+      labelDisks.push({ el, x: sx, y: sy, r: projR });
+      labelItems.push({ el, sx, a: Math.min(projR * 0.5, 46), x: 0, y: sy, w: size.w, h: size.h, flip: false });
+    });
+
+    // Standard: Symbol leicht links der Planetenmitte, Name nach rechts. Würde
+    // der Name einen anderen Planeten verdecken, wird das Label gespiegelt
+    // (Name nach links). Kleine Hysterese verhindert Flackern durch die Drift.
+    const clampX = (x, w) => Math.min(Math.max(x, LABEL_EDGE), W - w - LABEL_EDGE);
+    labelItems.forEach((it) => {
+      const right = clampX(it.sx - it.a - 15, it.w);
+      const left = clampX(it.sx + it.a + 15 - it.w, it.w);
+      const coverRight = labelCover(it, right);
+      const coverLeft = labelCover(it, left);
+      const wasFlipped = it.el.classList.contains("flip");
+      it.flip = wasFlipped ? coverLeft <= coverRight + 8 : coverLeft + 8 < coverRight;
+      it.x = it.flip ? left : right;
+      if (it.flip !== wasFlipped) it.el.classList.toggle("flip", it.flip);
     });
 
     labelItems.sort((a, b) => a.y - b.y);
     for (let i = 0; i < labelItems.length; i++) {
       const it = labelItems[i];
-      it.x = Math.min(Math.max(it.x, 6), W - it.w - 6);
       it.y = Math.min(Math.max(it.y, topLimit + it.h / 2), bottomLimit - it.h / 2);
       for (let j = 0; j < i; j++) {
         const o = labelItems[j];

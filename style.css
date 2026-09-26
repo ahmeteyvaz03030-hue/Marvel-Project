@@ -154,6 +154,21 @@ html, body {
   color: #ffd2c4;
 }
 
+/* Gespiegeltes Label (Name links vom Symbol), wenn rechts ein Nachbarplanet liegt. */
+.planet-label.flip {
+  flex-direction: row-reverse;
+}
+
+.planet-label.flip .name {
+  margin-left: 0;
+  margin-right: -12px;
+  padding: 7px 20px 7px 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-right: none;
+  border-radius: 18px 0 0 18px;
+  background: linear-gradient(270deg, rgba(8, 10, 22, 0.86), rgba(10, 12, 26, 0.62));
+}
+
 #hint {
   position: fixed;
   bottom: 28px;
@@ -2256,6 +2271,7 @@ html, body {
   .planet-label .dot { width: 26px; height: 26px; }
   .planet-label .dot svg { width: 15px; height: 15px; }
   .planet-label .name { font-size: 9.5px; letter-spacing: 1px; padding: 5px 11px 5px 16px; margin-left: -10px; }
+  .planet-label.flip .name { padding: 5px 16px 5px 11px; margin-left: 0; margin-right: -10px; }
 
   /* Panel-Inhalt beginnt unterhalb der Suchleiste/Steine-Anzeige statt darunter versteckt zu sein */
   #panel { padding-top: 66px; }
@@ -2319,6 +2335,7 @@ html, body {
   .planet-label .dot { width: 24px; height: 24px; }
   .planet-label .dot svg { width: 14px; height: 14px; }
   .planet-label .name { font-size: 8.5px; letter-spacing: 0.8px; padding: 4px 9px 4px 14px; margin-left: -10px; }
+  .planet-label.flip .name { padding: 4px 14px 4px 9px; margin-left: 0; margin-right: -10px; }
 
   #panel { padding-top: 54px; }
   #panel-close { top: 44px; right: 14px; z-index: 12; }
