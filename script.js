@@ -174,6 +174,8 @@
     "map-overlay",
     "snap-overlay",
     "secret-overlay",
+    "stats-overlay",
+    "profile-dashboard",
   ];
 
   let renderPaused = false;
@@ -184,6 +186,7 @@
       return el && !el.classList.contains("hidden");
     });
     renderPaused = covered || document.hidden;
+    if (window.MarvelGroot && MarvelGroot.setPaused) MarvelGroot.setPaused(renderPaused);
   }
 
   document.addEventListener("visibilitychange", updateRenderPause);
@@ -519,6 +522,8 @@
       const u = allUsers[id];
       if (!u) return;
       currentUser = id;
+      // Eigener Fortschritt pro Profil (gesehen, Watchlist, Bewertungen, Erfolge)
+      if (window.MarvelProgress) MarvelProgress.setProfile(id);
       document.getElementById("profile-avatar").innerHTML = avatarSvgFor(u);
       document.getElementById("profile-name").textContent = u.name;
       document.getElementById("profile-hero").textContent = u.hero;
@@ -536,6 +541,7 @@
     function endSession() {
       MarvelAuth.logout();
       currentUser = null;
+      if (window.MarvelProgress) MarvelProgress.setProfile(null);
       document.getElementById("profile-badge").classList.add("hidden");
       try {
         localStorage.removeItem("marvelUser");
@@ -3300,26 +3306,11 @@
     closeOverlay(document.getElementById("snap-overlay"));
   });
 
-  // ---------- Achievement: alle Universen besucht ----------
+  // ---------- Besuchte Universen (Erfolg "Multiverse Explorer") ----------
+  // Läuft über das gemeinsame Fortschrittssystem (pro Profil gespeichert);
+  // die frühere Einzelspeicherung marvelVisited_<profil> wird dort übernommen.
   function recordVisit(id) {
-    const key = `marvelVisited_${currentUser || "guest"}`;
-    let visited = [];
-    try {
-      visited = JSON.parse(localStorage.getItem(key) || "[]");
-    } catch (e) {
-      visited = [];
-    }
-    if (!visited.includes(id)) {
-      visited.push(id);
-      try {
-        localStorage.setItem(key, JSON.stringify(visited));
-      } catch (e) {
-        /* ignore */
-      }
-      if (visited.length === UNIVERSES.length) {
-        showToast("🏆 Achievement freigeschaltet: Multiversum-Entdecker — alle Universen besucht!");
-      }
-    }
+    if (window.MarvelProgress) MarvelProgress.recordVisit(id);
   }
 
   // ---------- Komposition der Szene ----------
@@ -5003,6 +4994,25 @@
     renderer.render(scene, camera);
     updatePerformance(rawDelta);
   }
+
+  // ---------- Brücke für eigenständige Module (progress-ui.js, groot.js) ----------
+  // Stellt die vorhandenen Helfer bereit, statt sie dort ein zweites Mal zu bauen
+  // (Overlays inkl. Render-Pause, Toasts, Sound, Poster, Navigation).
+  window.MarvelHUD = {
+    openOverlay,
+    closeOverlay,
+    showToast,
+    playClick: () => Sound.playClick(),
+    playCollect: () => Sound.playCollect(),
+    selectUniverse,
+    openFilmModal,
+    posterAbbrev,
+    loadPosterInto,
+    escapeAttr,
+    reduceMotion,
+    currentUser: () => currentUser,
+    avatarFor: (id) => (typeof AVATARS !== "undefined" ? AVATARS[id] : null),
+  };
 
   animate();
 })();

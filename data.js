@@ -29,13 +29,16 @@ const AVATARS = {
 };
 
 // Alle MCU-Filme in chronologischer Erscheinungsreihenfolge, bis Avengers: Doomsday.
+// Optionale Zusatzfelder für das Fortschrittssystem (progress.js):
+//   franchise   – Filmreihe für Erfolge ("ironman", "spiderman")
+//   releaseDate – Kinostart, falls der Film noch nicht erschienen ist
 const MCU_TIMELINE = [
   {
     phase: "Phase 1",
     films: [
-      { title: "Iron Man", year: 2008 },
+      { title: "Iron Man", year: 2008, franchise: "ironman" },
       { title: "Der unglaubliche Hulk", year: 2008 },
-      { title: "Iron Man 2", year: 2010 },
+      { title: "Iron Man 2", year: 2010, franchise: "ironman" },
       { title: "Thor", year: 2011 },
       { title: "Captain America: The First Avenger", year: 2011 },
       { title: "The Avengers", year: 2012 },
@@ -44,7 +47,7 @@ const MCU_TIMELINE = [
   {
     phase: "Phase 2",
     films: [
-      { title: "Iron Man 3", year: 2013 },
+      { title: "Iron Man 3", year: 2013, franchise: "ironman" },
       { title: "Thor: The Dark World", year: 2013 },
       { title: "Captain America: The Return of the First Avenger", year: 2014 },
       { title: "Guardians of the Galaxy", year: 2014 },
@@ -58,14 +61,14 @@ const MCU_TIMELINE = [
       { title: "Captain America: Civil War", year: 2016 },
       { title: "Doctor Strange", year: 2016 },
       { title: "Guardians of the Galaxy Vol. 2", year: 2017 },
-      { title: "Spider-Man: Homecoming", year: 2017 },
+      { title: "Spider-Man: Homecoming", year: 2017, franchise: "spiderman" },
       { title: "Thor: Ragnarok", year: 2017 },
       { title: "Black Panther", year: 2018 },
       { title: "Avengers: Infinity War", year: 2018 },
       { title: "Ant-Man and the Wasp", year: 2018 },
       { title: "Captain Marvel", year: 2019 },
       { title: "Avengers: Endgame", year: 2019 },
-      { title: "Spider-Man: Far From Home", year: 2019 },
+      { title: "Spider-Man: Far From Home", year: 2019, franchise: "spiderman" },
     ],
   },
   {
@@ -74,7 +77,7 @@ const MCU_TIMELINE = [
       { title: "Black Widow", year: 2021 },
       { title: "Shang-Chi and the Legend of the Ten Rings", year: 2021 },
       { title: "Eternals", year: 2021 },
-      { title: "Spider-Man: No Way Home", year: 2021 },
+      { title: "Spider-Man: No Way Home", year: 2021, franchise: "spiderman" },
       { title: "Doctor Strange in the Multiverse of Madness", year: 2022 },
       { title: "Thor: Love and Thunder", year: 2022 },
       { title: "Black Panther: Wakanda Forever", year: 2022 },
@@ -95,7 +98,7 @@ const MCU_TIMELINE = [
       { title: "Captain America: Brave New World", year: 2025 },
       { title: "Thunderbolts*", year: 2025 },
       { title: "The Fantastic Four: First Steps", year: 2025 },
-      { title: "Avengers: Doomsday", year: 2026, finale: true },
+      { title: "Avengers: Doomsday", year: 2026, finale: true, releaseDate: "2026-12-18" },
     ],
   },
 ];
@@ -384,9 +387,9 @@ const UNIVERSES = [
       },
     ],
     movies: [
-      { title: "Spider-Man", year: 2002 },
-      { title: "Spider-Man 2", year: 2004 },
-      { title: "Spider-Man 3", year: 2007 },
+      { title: "Spider-Man", year: 2002, franchise: "spiderman" },
+      { title: "Spider-Man 2", year: 2004, franchise: "spiderman" },
+      { title: "Spider-Man 3", year: 2007, franchise: "spiderman" },
       { title: "Spider-Man: No Way Home (Cameo)", year: 2021 },
     ],
   },
@@ -481,8 +484,8 @@ const UNIVERSES = [
       },
     ],
     movies: [
-      { title: "The Amazing Spider-Man", year: 2012 },
-      { title: "The Amazing Spider-Man 2", year: 2014 },
+      { title: "The Amazing Spider-Man", year: 2012, franchise: "spiderman" },
+      { title: "The Amazing Spider-Man 2", year: 2014, franchise: "spiderman" },
       { title: "Spider-Man: No Way Home (Cameo)", year: 2021 },
     ],
   },

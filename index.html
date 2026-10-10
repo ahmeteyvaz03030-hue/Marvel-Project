@@ -7,7 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="progress.css?v=35">
+<link rel="stylesheet" href="watch.css?v=35">
+<link rel="stylesheet" href="groot.css?v=35">
 </head>
 <body>
 
@@ -75,7 +78,11 @@
     <button id="profile-logout" title="Abmelden">⏻</button>
   </div>
 
-  <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
+  <!-- Multiverse-Progress-Widget (ersetzt die frühere Einzelanzeige oben rechts;
+       die Infinity-Steine-Anzeige lebt als kleine Zeile darin weiter). Inhalt: progress-ui.js -->
+  <div id="progress-widget" class="hidden">
+    <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
+  </div>
 
   <div id="toast-layer"></div>
 
@@ -125,6 +132,9 @@
     <button id="map-btn" class="command-btn">🌌 <span>MULTIVERSE MAP</span></button>
   </div>
 
+  <!-- Groot (eigenständige Komponente, groot.js) -->
+  <div id="groot-widget" class="hidden"></div>
+
   <div id="more-hud">
     <button id="favorites-btn" class="more-hud-btn">⭐ <span>FAVORITEN</span></button>
     <button id="theories-btn" class="more-hud-btn">🔮 <span>THEORIEN</span></button>
@@ -172,6 +182,7 @@
 
         <div id="discover-filter-universe" class="discover-filter-row"></div>
         <div id="discover-filter-phase" class="discover-filter-row hidden"></div>
+        <div id="discover-filter-status" class="discover-filter-row"></div>
 
         <div id="discover-toolbar-foot">
           <span id="discover-count"></span>
@@ -183,6 +194,7 @@
       </div>
 
       <div id="discover-view-series" class="discover-view hidden">
+        <div id="discover-series-filter-status" class="discover-filter-row"></div>
         <div id="discover-series-grid" class="film-grid"></div>
       </div>
 
@@ -270,6 +282,7 @@
       </div>
 
       <p id="panel-desc"></p>
+      <section id="panel-progress" class="panel-section" hidden></section>
 
       <div id="countdown-block" class="hidden">
         <div class="countdown-label">KINOSTART — COUNTDOWN</div>
@@ -328,6 +341,7 @@
               <span id="film-year" class="stat-badge stat-badge-outline"></span>
               <span id="film-era" class="stat-badge stat-badge-outline"></span>
             </div>
+            <div id="film-progress-actions"></div>
           </div>
         </div>
       </header>
@@ -377,6 +391,10 @@
       <button type="submit" aria-label="Senden">▸</button>
     </form>
   </div>
+
+  <!-- Ausführliche Fortschritts-Statistik und persönliches Profil (progress-ui.js) -->
+  <div id="stats-overlay" class="hidden"></div>
+  <div id="profile-dashboard" class="hidden"></div>
 
   <div id="secret-overlay" class="hidden">
     <div id="secret-content">
@@ -464,12 +482,15 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="config.js?v=34"></script>
-  <script src="tmdb.js?v=34"></script>
-  <script src="data.js?v=34"></script>
-  <script src="derive.js?v=34"></script>
-  <script src="auth.js?v=34"></script>
-  <script src="scene-shaders.js?v=34"></script>
-  <script src="script.js?v=34"></script>
+  <script src="config.js?v=35"></script>
+  <script src="tmdb.js?v=35"></script>
+  <script src="data.js?v=35"></script>
+  <script src="derive.js?v=35"></script>
+  <script src="progress.js?v=35"></script>
+  <script src="auth.js?v=35"></script>
+  <script src="scene-shaders.js?v=35"></script>
+  <script src="script.js?v=35"></script>
+  <script src="progress-ui.js?v=35"></script>
+  <script src="groot.js?v=35"></script>
 </body>
 </html>
