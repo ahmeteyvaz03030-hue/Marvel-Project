@@ -1,1 +1,382 @@
-/* Groot-Komponente */
+/* ===========================================================================
+   Groot-Begleiter (groot.js): transparentes 3D-Canvas über MEHR-Widget und
+   J.A.R.V.I.S.-Button. Nur Figur/Plattform (Trefferfläche) und das kleine
+   HUD nehmen Klicks an — daneben erreichen Klicks weiterhin die Planeten.
+   =========================================================================== */
+#groot-widget {
+  position: fixed;
+  right: 18px;
+  bottom: 146px;
+  z-index: 6;
+  height: clamp(118px, 19.5vh, 200px);
+  aspect-ratio: 37 / 50;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, visibility 0.35s ease, transform 0.35s ease;
+}
+
+#groot-widget.groot-shown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+/* Niedrige Laptop-Displays: etwas kleiner, damit die Äste des erwachsenen Groot
+   nicht an den Doomsday-Planeten heranreichen */
+@media (max-height: 700px) and (min-width: 641px) {
+  #groot-widget { height: clamp(112px, 18vh, 200px); }
+}
+
+/* Tablets im Hochformat: der Ring von Fantastic Four reicht unten weit nach
+   rechts — Groot bleibt dort etwas kleiner */
+@media (min-width: 641px) and (max-width: 1100px) and (orientation: portrait) {
+  #groot-widget { height: clamp(118px, 14.5vh, 172px); }
+}
+
+/* Rückfall, falls die Klasse einmal nicht synchron ist: Universum-Panel offen */
+body.panel-open #groot-widget {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.groot-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity 0.22s ease;
+}
+
+/* Kurzes Überblenden beim Profilwechsel */
+#groot-widget.groot-swap .groot-canvas { opacity: 0; }
+
+.groot-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 46% 46% 30% 30%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.groot-hit:focus { outline: none; }
+.groot-hit:focus-visible {
+  outline: 1px dashed rgba(125, 255, 170, 0.75);
+  outline-offset: 3px;
+}
+
+/* ---------- Sprechblase ---------- */
+.groot-bubble {
+  position: absolute;
+  right: 20px;
+  bottom: 100%;
+  z-index: 2;
+  padding: 6px 13px 7px;
+  border-radius: 14px 14px 4px 14px;
+  border: 1px solid rgba(125, 255, 170, 0.45);
+  background: linear-gradient(180deg, rgba(10, 26, 22, 0.94), rgba(6, 14, 20, 0.94));
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.9), 0 0 18px -8px rgba(110, 255, 170, 0.6);
+  color: #e6ffe9;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px) scale(0.92);
+  transform-origin: 100% 100%;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.groot-bubble.show {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- HUD-Panel (klein, neben Groot — kein Vollbild-Overlay) ---------- */
+.groot-hud {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 6px;
+  z-index: 3;
+  width: 262px;
+  padding: 12px 15px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(90, 190, 255, 0.35);
+  background: linear-gradient(180deg, rgba(8, 14, 26, 0.96), rgba(5, 8, 16, 0.96));
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.95), 0 0 30px -14px rgba(80, 180, 255, 0.55);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font-family: var(--font-body);
+  pointer-events: auto;
+  animation: grootHudIn 0.24s ease;
+}
+
+.groot-hud[hidden] { display: none; }
+
+@keyframes grootHudIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.groot-hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.groot-hud-top .panel-eyebrow {
+  margin-top: 0;
+  font-size: 9.5px;
+  color: #7dffa8;
+}
+
+.groot-hud-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.groot-hud-close:hover { color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+
+.groot-hud-title {
+  margin: 2px 0 2px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(110, 255, 170, 0.35);
+}
+
+.groot-hud-stage {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #c9ffd9;
+}
+
+.groot-hud-stage small {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.groot-hud-pips {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 10px;
+}
+
+.groot-hud-pips i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.groot-hud-pips i.on {
+  background: linear-gradient(90deg, #5dffa0, #ffce54);
+  box-shadow: 0 0 8px -1px rgba(110, 255, 170, 0.7);
+}
+
+.groot-hud-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.groot-hud-row strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+.groot-hud-bar {
+  position: relative;
+  height: 6px;
+  margin: 5px 0 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.groot-hud-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4fd8ff, #5dffa0 60%, #ffce54);
+  box-shadow: 0 0 10px rgba(93, 255, 160, 0.55);
+  transition: width 0.6s ease;
+}
+
+/* Stufenschwellen 20/40/60/80 % */
+.groot-hud-bar b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(5, 8, 16, 0.85);
+}
+
+.groot-hud-count {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.groot-hud-next {
+  margin-top: 7px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 206, 84, 0.22);
+  background: rgba(255, 206, 84, 0.06);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #ffe3a1;
+}
+
+.groot-hud-note {
+  margin: 9px 0 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  letter-spacing: 0.3px;
+  color: rgba(154, 161, 196, 0.85);
+}
+
+/* ---------- Smartphone hochkant: kompaktes rundes Widget links über dem Profil ---------- */
+@media (max-width: 640px) {
+  #groot-widget {
+    left: 12px;
+    right: auto;
+    bottom: 148px;
+    width: 60px;
+    height: 60px;
+    aspect-ratio: auto;
+    border-radius: 50%;
+    border: 1px solid rgba(110, 230, 170, 0.45);
+    background: radial-gradient(circle at 50% 36%, rgba(40, 96, 78, 0.6), rgba(6, 10, 22, 0.94) 72%);
+    box-shadow: 0 0 22px -6px rgba(90, 230, 160, 0.6);
+  }
+
+  /* Fortschrittsring um das runde Widget */
+  #groot-widget::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(#5dffa0 0, #ffce54 calc(var(--groot-p, 0) * 1%), rgba(255, 255, 255, 0.1) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    pointer-events: none;
+  }
+
+  .groot-canvas { border-radius: 50%; }
+  .groot-hit { border-radius: 50%; }
+
+  .groot-bubble {
+    left: 0;
+    right: auto;
+    bottom: calc(100% + 10px);
+    border-radius: 14px 14px 14px 4px;
+    transform-origin: 0 100%;
+  }
+
+  .groot-hud {
+    left: 0;
+    right: auto;
+    bottom: calc(100% + 10px);
+    width: min(280px, calc(100vw - 24px));
+  }
+
+  #groot-widget.groot-hud-open .groot-bubble { opacity: 0; }
+}
+
+/* ---------- Smartphone quer: kompakt links neben dem J.A.R.V.I.S.-Button ---------- */
+@media (max-height: 480px) and (orientation: landscape) {
+  #groot-widget {
+    left: auto;
+    right: 78px;
+    bottom: 55px;
+    width: 52px;
+    height: 52px;
+    aspect-ratio: auto;
+    border-radius: 50%;
+    border: 1px solid rgba(110, 230, 170, 0.45);
+    background: radial-gradient(circle at 50% 36%, rgba(40, 96, 78, 0.6), rgba(6, 10, 22, 0.94) 72%);
+    box-shadow: 0 0 20px -6px rgba(90, 230, 160, 0.6);
+  }
+
+  #groot-widget::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(#5dffa0 0, #ffce54 calc(var(--groot-p, 0) * 1%), rgba(255, 255, 255, 0.1) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    pointer-events: none;
+  }
+
+  .groot-canvas { border-radius: 50%; }
+  .groot-hit { border-radius: 50%; }
+
+  .groot-bubble {
+    left: auto;
+    right: 0;
+    bottom: calc(100% + 8px);
+    border-radius: 14px 14px 4px 14px;
+    transform-origin: 100% 100%;
+  }
+
+  /* HUD links neben dem Widget, unten bündig: so bleibt es unter der Suchleiste
+     oben rechts (sonst läge der Schließen-Button darunter) */
+  .groot-hud {
+    left: auto;
+    right: calc(100% + 10px);
+    bottom: 0;
+    width: min(270px, calc(100vw - 120px));
+    max-height: calc(100vh - 115px);
+    overflow-y: auto;
+  }
+
+  #groot-widget.groot-hud-open .groot-bubble { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #groot-widget,
+  .groot-bubble,
+  .groot-canvas { transition-duration: 0.08s; }
+  .groot-hud { animation: none; }
+}
