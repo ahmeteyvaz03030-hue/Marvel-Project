@@ -782,6 +782,84 @@ window.SCENE_SHADERS = (function () {
     }
   `;
 
+  // Energiering der Fortschritts-Effekte (Einheitsring um einen Planeten):
+  // feine Linie mit weichem Glow, die abgewandte Hälfte schwächer (Tiefe), dazu
+  // zwei wandernde Lichtpunkte mit kurzem Schweif. Die Linienbreite wird an der
+  // Pixelgröße begrenzt, damit der Ring auch bei kleinen Planeten sauber
+  // geglättet bleibt statt zu flimmern.
+  const progressRingVertex = `
+    varying vec2 vLocal;
+    varying float vFront;
+    void main() {
+      vLocal = position.xy;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vec4 center = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      float scale = length((modelViewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
+      vFront = (mv.z - center.z) / max(scale * length(position.xy), 1e-4);
+      gl_Position = projectionMatrix * mv;
+    }
+  `;
+
+  const progressRingFragment = `
+    uniform vec3 uColor;
+    uniform float uOpacity;
+    uniform float uWidth;
+    uniform float uTime;
+    uniform float uSpeed;
+    uniform float uPhase;
+    varying vec2 vLocal;
+    varying float vFront;
+    void main() {
+      float r = length(vLocal);
+      float w = max(uWidth, fwidth(r) * 0.85);
+      float x = (r - 1.0) / w;
+      float core = exp(-x * x * 4.0);
+      float glow = exp(-x * x * 0.55) * 0.3;
+      float thin = mix(1.0, uWidth / w, 0.6);
+      float ang = atan(vLocal.y, vLocal.x) / 6.28318530718;
+      float s = fract(ang + uPhase - uTime * uSpeed);
+      float s2 = fract(s + 0.5);
+      float spark = exp(-(1.0 - s) * 26.0) * (1.0 - smoothstep(0.993, 1.0, s));
+      spark += exp(-(1.0 - s2) * 34.0) * (1.0 - smoothstep(0.993, 1.0, s2)) * 0.55;
+      float depth = mix(0.28, 1.0, smoothstep(-0.85, 0.5, vFront));
+      float a = ((core * 0.7 + glow) * depth + spark * (core * 2.2 + glow * 1.6) * mix(0.5, 1.0, depth)) * thin;
+      vec3 col = mix(uColor, vec3(1.0), clamp(spark * core * 0.6, 0.0, 0.65));
+      gl_FragColor = vec4(col, clamp(a * uOpacity, 0.0, 1.0));
+    }
+  `;
+
+  // Zusätzliche Atmosphärenschicht der Fortschritts-Effekte (nutzt
+  // atmosphereVertex): ein weiches Band knapp außerhalb des Planetenrands statt
+  // eines zweiten Maximums direkt am Rand — so wirkt die Atmosphäre dichter und
+  // weiter, ohne dass der ohnehin helle Rand der vorhandenen Atmosphäre ins
+  // Weiße überstrahlt. b = Abstand der Sichtlinie zur Planetenmitte.
+  const progressAtmoFragment = `
+    uniform vec3 uColor;
+    uniform vec3 uColor2;
+    uniform vec3 uSunPos;
+    uniform float uIntensity;
+    uniform float uScale;
+    uniform float uPeak;
+    uniform float uHover;
+    varying vec3 vNormalV;
+    varying vec3 vPosV;
+    varying vec3 vWorldPos;
+    varying vec3 vWorldNormal;
+    void main() {
+      vec3 Vv = normalize(-vPosV);
+      float d = clamp(-dot(normalize(vNormalV), Vv), 0.0, 1.0);
+      float b = uScale * sqrt(1.0 - d * d);
+      float inner = smoothstep(0.99, uPeak, b);
+      float outer = 1.0 - smoothstep(uPeak, uScale, b);
+      float band = inner * outer * sqrt(outer);
+      vec3 L = normalize(uSunPos - vWorldPos);
+      float sunSide = smoothstep(-0.6, 0.7, dot(normalize(vWorldNormal), L));
+      vec3 col = mix(uColor, uColor2, sunSide);
+      float a = band * (0.5 + 0.5 * sunSide) * uIntensity * (1.0 + uHover * 0.5);
+      gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+    }
+  `;
+
   return {
     bakeVertex,
     surfaceBakeFragment,
@@ -805,5 +883,8 @@ window.SCENE_SHADERS = (function () {
     orbitRingFragment,
     nebulaBakeFragment,
     nebulaCloudBakeFragment,
+    progressRingVertex,
+    progressRingFragment,
+    progressAtmoFragment,
   };
 })();

@@ -3569,6 +3569,263 @@
     });
   });
 
+  // ---------- Fortschritts-Effekte an den Planeten ----------
+  // Eigene, leichte Zusatzebene je Planet, abhängig von der Effektstufe aus
+  // MarvelProgress.universeStats(id).tier (kumulativ): 1 zusätzlicher Glow,
+  // 2 feiner Energiering, 3 dichtere Atmosphäre, 4 goldener Abschluss.
+  // Alles hängt an p.body (Einheitsradius), damit Größe, Drift, Neigung und
+  // Hover automatisch mitgehen; Planetenmaterial, Atmosphäre und Raycast (prüft
+  // nur p.mesh) bleiben unberührt. Die Objekte entstehen erst, wenn eine Welt
+  // zum ersten Mal eine Stufe erreicht; ausgeblendete Ebenen sind unsichtbar
+  // (kein zusätzlicher Draw-Call).
+  const progressFx = (function createProgressFx() {
+    const GOLD = new THREE.Color("#ffb52e");
+    const GOLD_RING = new THREE.Color("#ffc94a");
+    const GOLD_ATMO = new THREE.Color("#ff9a2e");
+    const GOLD_ATMO2 = new THREE.Color("#ffbf4d");
+    const RING_WIDTH = 0.011; // relativ zum Ringradius
+    const FADE_SPEED = 2.2; // weiches Ein-/Ausblenden (pro Sekunde)
+    const LAYERS = ["glow", "ring", "atmo", "gold"];
+    const RING_VIEW = 1.18; // Winkel zwischen Ringachse und Blickrichtung (Ellipse ~0,38)
+    let ringGeometry = null;
+    let coronaTexture = null;
+    // Wiederverwendete Hilfsobjekte (keine Allokationen pro Frame)
+    const _view = new THREE.Vector3();
+    const _up = new THREE.Vector3();
+    const _right = new THREE.Vector3();
+    const _axisX = new THREE.Vector3();
+    const _axisY = new THREE.Vector3();
+    const _axisZ = new THREE.Vector3();
+    const _basis = new THREE.Matrix4();
+    const _groupInv = new THREE.Quaternion();
+
+    const items = planetObjects.map((p, idx) => ({
+      p,
+      idx,
+      built: false,
+      active: false,
+      target: { glow: 0, ring: 0, atmo: 0, gold: 0 },
+      value: { glow: 0, ring: 0, atmo: 0, gold: 0 },
+    }));
+
+    function additiveSprite(map, color) {
+      return new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map,
+          color,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          fog: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+    }
+
+    function build(it) {
+      const p = it.p;
+      const look = p.look;
+      const atmoScale = look.atmoScale || 1.22;
+
+      // Stufe 1: weiches Glühen in der Halo-Farbe, etwas weiter als der vorhandene Halo.
+      it.glowScale = (look.halo ? look.halo.scale : 4) * 1.14;
+      it.glow = additiveSprite(haloTexture, new THREE.Color(look.halo ? look.halo.color : look.atmo));
+      it.glow.scale.setScalar(it.glowScale);
+
+      // Stufe 2: feiner, leicht geneigter Energiering. Bei beringten Welten in
+      // dieselbe Richtung geneigt wie der vorhandene Ring (liegt innerhalb davon
+      // und wirkt so als Teil des Ringsystems statt ihn zu kreuzen). Die
+      // Ausrichtung folgt der Blickrichtung (siehe orientRing), damit der Ring
+      // auch in der Nahansicht nie hochkant als Strich über dem Planeten liegt.
+      if (!ringGeometry) {
+        ringGeometry = new THREE.RingGeometry(1 - RING_WIDTH * 6, 1 + RING_WIDTH * 6, LOW_TIER ? 128 : 192, 1);
+      }
+      it.ringColor = new THREE.Color(look.atmo2 || look.atmo);
+      it.ring = new THREE.Mesh(
+        ringGeometry,
+        new THREE.ShaderMaterial({
+          uniforms: {
+            uColor: { value: it.ringColor.clone() },
+            uOpacity: { value: 0 },
+            uWidth: { value: RING_WIDTH },
+            uTime: sunUniforms.uTime, // steht bei "Bewegung reduzieren" still
+            uSpeed: { value: 0.032 + (it.idx % 3) * 0.006 },
+            uPhase: { value: it.idx * 0.37 },
+          },
+          vertexShader: SH.progressRingVertex,
+          fragmentShader: SH.progressRingFragment,
+          extensions: { derivatives: true },
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      const side = look.ring ? -Math.sign(look.ring.tilt[1]) || 1 : it.idx % 2 ? 1 : -1;
+      it.ringTilt = 0.3 * side;
+      it.ring.scale.setScalar(Math.max(1.38, atmoScale + 0.12));
+
+      // Stufe 3: zusätzliche, größere Atmosphärenschale mit eigenem Material
+      // (Band knapp außerhalb der vorhandenen Atmosphäre, die unverändert bleibt).
+      const shellScale = atmoScale * 1.2;
+      it.atmoColor = new THREE.Color(look.atmo);
+      it.atmoColor2 = new THREE.Color(look.atmo2 || look.atmo);
+      it.atmoIntensity = 0.28;
+      it.atmo = new THREE.Mesh(
+        shellGeometry,
+        new THREE.ShaderMaterial({
+          uniforms: {
+            uColor: { value: it.atmoColor.clone() },
+            uColor2: { value: it.atmoColor2.clone() },
+            uSunPos: sharedPlanetUniforms.uSunPos,
+            uIntensity: { value: 0 },
+            uScale: { value: shellScale },
+            uPeak: { value: atmoScale - 0.05 },
+            uHover: p.uniforms.uHover,
+          },
+          vertexShader: SH.atmosphereVertex,
+          fragmentShader: SH.progressAtmoFragment,
+          transparent: true,
+          side: THREE.BackSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      it.atmo.scale.setScalar(shellScale);
+
+      // Stufe 4: goldene Korona — ein Lichtkranz, der knapp außerhalb der
+      // Atmosphäre liegt (innen leer), damit das Gold nicht mit der
+      // Planetenfarbe zu Weiß verschwimmt.
+      if (!coronaTexture) {
+        coronaTexture = makeRadialTexture(256, [
+          [0, "rgba(255,255,255,0)"],
+          [0.47, "rgba(255,255,255,0)"],
+          [0.56, "rgba(255,255,255,0.4)"],
+          [0.63, "rgba(255,255,255,0.85)"],
+          [0.69, "rgba(255,255,255,0.55)"],
+          [0.79, "rgba(255,255,255,0.18)"],
+          [0.9, "rgba(255,255,255,0.04)"],
+          [1, "rgba(255,255,255,0)"],
+        ]);
+      }
+      it.goldScale = atmoScale * 3.2;
+      it.gold = additiveSprite(coronaTexture, GOLD.clone());
+      it.gold.scale.setScalar(it.goldScale);
+
+      [it.glow, it.ring, it.atmo, it.gold].forEach((obj) => {
+        obj.visible = false;
+        p.body.add(obj);
+      });
+      it.built = true;
+    }
+
+    // Stufen neu berechnen (nur bei Fortschrittsänderungen, nicht pro Frame).
+    function refresh() {
+      const MP = window.MarvelProgress;
+      const hasProfile = Boolean(MP && MP.profile && MP.profile());
+      items.forEach((it) => {
+        let tier = 0;
+        if (hasProfile) {
+          try {
+            tier = MP.universeStats(it.p.data.id).tier || 0;
+          } catch (e) {
+            tier = 0;
+          }
+        }
+        if (tier > 0 && !it.built) build(it);
+        it.target.glow = tier >= 1 ? 1 : 0;
+        it.target.ring = tier >= 2 ? 1 : 0;
+        it.target.atmo = tier >= 3 ? 1 : 0;
+        it.target.gold = tier >= 4 ? 1 : 0;
+        if (it.built && tier > 0) it.active = true;
+      });
+    }
+
+    // Ring wie von leicht oben gesehen ausrichten: Achse um RING_VIEW aus der
+    // Blickrichtung zur Bildoberkante gekippt, im Bild um ringTilt geneigt.
+    // Die vordere Hälfte liegt damit immer unten vor dem Planeten.
+    function orientRing(it, tm) {
+      const g = it.p.group; // direktes Kind der Szene, body ist nicht gedreht
+      _view.copy(camera.position).sub(g.position).normalize();
+      _up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      _up.addScaledVector(_view, -_up.dot(_view)).normalize();
+      _right.crossVectors(_up, _view);
+      const tilt = it.ringTilt + (reduceMotion ? 0 : Math.sin(tm * 0.11 + it.idx) * 0.05);
+      const c = Math.cos(tilt);
+      const s = Math.sin(tilt);
+      _axisX.copy(_right).multiplyScalar(c).addScaledVector(_up, -s);
+      _axisY.copy(_up).multiplyScalar(c).addScaledVector(_right, s);
+      _axisZ.copy(_view).multiplyScalar(Math.cos(RING_VIEW)).addScaledVector(_axisY, Math.sin(RING_VIEW));
+      _axisY.crossVectors(_axisZ, _axisX);
+      _basis.makeBasis(_axisX, _axisY, _axisZ);
+      it.ring.quaternion.setFromRotationMatrix(_basis);
+      it.ring.quaternion.premultiply(_groupInv.copy(g.quaternion).invert());
+    }
+
+    function update(dt, tm) {
+      const k = 1 - Math.exp(-dt * FADE_SPEED);
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (!it.active) continue;
+        const v = it.value;
+        let settledToZero = true;
+        for (let j = 0; j < LAYERS.length; j++) {
+          const key = LAYERS[j];
+          const target = it.target[key];
+          v[key] += (target - v[key]) * k;
+          if (Math.abs(target - v[key]) < 0.008) v[key] = target;
+          if (v[key] > 0 || target > 0) settledToZero = false;
+        }
+
+        // Sanftes Pulsieren nur im goldenen Abschluss (bei reduzierter Bewegung aus).
+        const wave = reduceMotion ? 0 : Math.sin(tm * 1.3 + it.idx * 0.8) * v.gold;
+        const hover = 1 + it.p.hover * 0.5;
+
+        // Im goldenen Abschluss ersetzt die Korona den farbigen Glow.
+        const glowOpacity = 0.25 * v.glow * (1 - v.gold) * hover;
+        it.glow.material.opacity = glowOpacity;
+        it.glow.visible = glowOpacity > 0.002;
+
+        const goldOpacity = 0.4 * v.gold * (1 + 0.18 * wave) * hover;
+        it.gold.material.opacity = goldOpacity;
+        it.gold.scale.setScalar(it.goldScale * (1 + 0.015 * wave));
+        it.gold.visible = goldOpacity > 0.002;
+
+        const ringU = it.ring.material.uniforms;
+        const ringOpacity = (0.55 + 0.25 * v.gold) * v.ring * (1 + 0.12 * wave) * hover;
+        ringU.uColor.value.copy(it.ringColor).lerp(GOLD_RING, v.gold);
+        ringU.uOpacity.value = ringOpacity;
+        it.ring.visible = ringOpacity > 0.002;
+        if (it.ring.visible) orientRing(it, tm);
+
+        const atmoU = it.atmo.material.uniforms;
+        const atmoIntensity = it.atmoIntensity * v.atmo * (1 - 0.3 * v.gold) * (1 + 0.1 * wave);
+        atmoU.uColor.value.copy(it.atmoColor).lerp(GOLD_ATMO, v.gold);
+        atmoU.uColor2.value.copy(it.atmoColor2).lerp(GOLD_ATMO2, v.gold);
+        atmoU.uIntensity.value = atmoIntensity;
+        it.atmo.visible = atmoIntensity > 0.002;
+
+        // Vollständig ausgeblendet: bis zur nächsten Stufe nichts mehr rechnen.
+        if (settledToZero) {
+          it.active = false;
+          it.glow.visible = false;
+          it.ring.visible = false;
+          it.atmo.visible = false;
+          it.gold.visible = false;
+        }
+      }
+    }
+
+    if (window.MarvelProgress && MarvelProgress.subscribe) {
+      MarvelProgress.subscribe((ev) => {
+        if (ev && (ev.type === "profile" || ev.type === "sync" || ev.type === "watched")) refresh();
+      });
+    }
+    refresh();
+
+    return { update, refresh };
+  })();
+
   // ---------- Doctor Doom (stilisierte Wächter-Figur) ----------
   // Kein echtes Schauspielerfoto (Urheber-/Persönlichkeitsrechte) — stattdessen eine
   // bewusst erwachsen und bedrohlich wirkende, hochaufgelöste Metall-Silhouette.
@@ -5533,6 +5790,8 @@
         p.ring.material.uniforms.uPlanetRadius.value = p.radius * p.group.scale.x;
       }
     });
+    // Fortschritts-Effekte weich nachführen (nur Welten mit aktiver Stufe).
+    progressFx.update(dt, tm);
 
     // Parallaxe des letzten Frames zurücknehmen, bevor die Kamera weiterrechnet.
     camera.position.sub(appliedParallax);
