@@ -1,1 +1,761 @@
 /* Gesehen / Watchlist / Bewertung in Entdecken, Marvel Travel, Universum-Panel und Filmkarte */
+
+:root {
+  --watch-green: #3ddc84;
+  --watch-green-glow: rgba(61, 220, 132, 0.6);
+  --watch-gold: #ffce54;
+  --watch-blue: #5abeff;
+  --watch-soon: #ff7a59;
+}
+
+/* Elemente mit eigenem display-Wert trotzdem per [hidden] ausblendbar */
+.watch-modal-actions[hidden],
+.watch-travel-progress[hidden],
+#panel-progress[hidden],
+.pp-card [hidden] {
+  display: none !important;
+}
+
+/* Ohne aktives Profil gibt es keinen persönlichen Stand */
+body.watch-signed-out .watch-actions,
+body.watch-signed-out .watch-badge-seen,
+body.watch-signed-out .watch-badge-list,
+body.watch-signed-out .watch-btn,
+body.watch-signed-out .watch-chip,
+body.watch-signed-out .watch-filter-label,
+body.watch-signed-out .watch-travel-progress,
+body.watch-signed-out #film-progress-actions,
+body.watch-signed-out #panel-progress {
+  display: none !important;
+}
+
+/* ---------- SVG-Symbole ---------- */
+.wi-ring {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  transition: fill 0.25s ease, stroke 0.25s ease;
+}
+
+.wi-check {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.watch-btn .wi-check {
+  stroke-width: 2.4;
+  opacity: 0.4;
+  transition: opacity 0.2s ease, stroke 0.2s ease;
+}
+
+.wi-mark {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+  transition: fill 0.2s ease;
+}
+
+.wi-star {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transition: fill 0.18s ease, stroke 0.18s ease;
+}
+
+/* ---------- Umschalt-Knöpfe ---------- */
+.watch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+
+.watch-btn svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.watch-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watch-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.watch-btn:hover .wi-check { opacity: 0.85; }
+.watch-btn:active { transform: scale(0.95); }
+
+.watch-btn:focus-visible,
+.watch-star:focus-visible,
+.watch-chip:focus-visible {
+  outline: 2px solid var(--watch-blue);
+  outline-offset: 2px;
+}
+
+/* Gesehen: grün mit Glow */
+.watch-btn-seen[aria-pressed="true"] {
+  color: var(--watch-green);
+  background: rgba(61, 220, 132, 0.13);
+  border-color: rgba(61, 220, 132, 0.62);
+  box-shadow: 0 0 16px -5px var(--watch-green-glow), inset 0 0 12px rgba(61, 220, 132, 0.1);
+}
+
+.watch-btn-seen[aria-pressed="true"] .wi-ring {
+  fill: var(--watch-green);
+  stroke: var(--watch-green);
+}
+
+.watch-btn-seen[aria-pressed="true"] .wi-check {
+  stroke: #04170c;
+  opacity: 1;
+}
+
+.watch-btn-seen[aria-pressed="true"] svg {
+  animation: watchPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Noch nicht erschienen: deaktiviert, mit Datum */
+.watch-btn-seen:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--watch-soon) 85%, #fff);
+  background: rgba(255, 90, 60, 0.06);
+  border-style: dashed;
+  border-color: rgba(255, 122, 89, 0.38);
+  box-shadow: none;
+  transform: none;
+  letter-spacing: 0.6px;
+}
+
+.watch-btn-seen:disabled .wi-check { opacity: 0; }
+.watch-btn-seen:disabled .wi-ring { stroke-dasharray: 2.4 2.6; }
+
+/* Watchlist: JARVIS-Blau, Lesezeichen gefüllt */
+.watch-btn-list[aria-pressed="true"] {
+  color: var(--watch-blue);
+  background: rgba(90, 190, 255, 0.12);
+  border-color: rgba(90, 190, 255, 0.6);
+  box-shadow: 0 0 16px -5px rgba(90, 190, 255, 0.7);
+}
+
+.watch-btn-list[aria-pressed="true"] .wi-mark { fill: currentColor; }
+.watch-btn-list[aria-pressed="true"] svg { animation: watchPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes watchPop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- Sterne ---------- */
+.watch-stars {
+  display: flex;
+  align-items: center;
+  margin: 0 -3px;
+}
+
+.watch-star {
+  flex: 0 1 32px;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.18s ease, transform 0.15s ease;
+}
+
+.watch-star svg {
+  width: 17px;
+  height: 17px;
+  transition: transform 0.18s ease;
+}
+
+.watch-star.is-on { color: var(--watch-gold); }
+
+.watch-star.is-on .wi-star {
+  fill: currentColor;
+  filter: drop-shadow(0 0 4px rgba(255, 206, 84, 0.55));
+}
+
+.watch-star:active svg { transform: scale(0.88); }
+
+/* Vorschau beim Überfahren */
+.watch-stars.is-previewing .watch-star { color: rgba(255, 255, 255, 0.4); }
+.watch-stars.is-previewing .watch-star .wi-star { fill: transparent; filter: none; }
+.watch-stars.is-previewing .watch-star.is-preview { color: #ffe08f; }
+.watch-stars.is-previewing .watch-star.is-preview .wi-star { fill: rgba(255, 206, 84, 0.45); }
+.watch-stars.is-previewing .watch-star.is-preview svg { transform: scale(1.12); }
+
+/* Erst nach dem Ansehen bewertbar */
+.watch-stars.is-locked { opacity: 0.38; }
+.watch-stars.is-locked .watch-star { color: rgba(255, 255, 255, 0.55); cursor: not-allowed; }
+.watch-stars.is-locked .watch-star .wi-star { stroke-dasharray: 2 2.4; }
+
+/* ---------- Entdecken: Karten ---------- */
+.watch-card { position: relative; }
+
+.watch-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.watch-actions-row {
+  display: flex;
+  gap: 6px;
+}
+
+.watch-actions .watch-btn-seen { flex: 1 1 auto; min-width: 0; }
+.watch-actions .watch-btn-list { flex: 0 0 34px; padding: 0; }
+
+/* Poster-Overlay: deckt exakt das Poster ab (gleiche Breite und Seitenverhältnis) */
+.watch-badges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  pointer-events: none;
+  z-index: 2;
+  transition: transform 0.25s ease;
+}
+
+.film-card:hover .watch-badges { transform: translateY(-4px); }
+
+.watch-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.watch-badge-seen {
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #04170c;
+  background: radial-gradient(circle at 35% 30%, #7dffb4, var(--watch-green) 60%, #1fa95e);
+  box-shadow: 0 0 0 2px rgba(5, 6, 12, 0.6), 0 0 14px 2px var(--watch-green-glow);
+}
+
+.watch-badge-seen svg { width: 15px; height: 15px; }
+
+.watch-badge-list {
+  top: -1px;
+  right: 9px;
+  width: 24px;
+  height: 33px;
+  color: #eaf6ff;
+  transform: translateY(-8px);
+  filter: drop-shadow(0 0 6px rgba(90, 190, 255, 0.85)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+.watch-badge-list svg { width: 100%; height: 100%; }
+
+.watch-badge-list .wi-mark {
+  fill: var(--watch-blue);
+  stroke: #eaf6ff;
+  stroke-width: 1.4;
+}
+
+.watch-badge-soon {
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #ff5a3c, #ff8a4c);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 14px rgba(255, 90, 60, 0.6);
+}
+
+.is-watched .watch-badge-seen,
+.is-upcoming .watch-badge-soon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.is-listed .watch-badge-list {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dezente Markierung gesehener Poster */
+.watch-card.is-watched .film-poster {
+  border-color: rgba(61, 220, 132, 0.5);
+  box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.16), 0 10px 26px -14px var(--watch-green-glow);
+}
+
+.watch-card.is-watched:hover .film-poster {
+  box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.22), 0 14px 30px -12px var(--watch-green-glow);
+}
+
+/* ---------- Entdecken: Status-Filter ---------- */
+.watch-filter-row { align-items: center; }
+
+.watch-filter-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.75;
+  margin-right: 2px;
+}
+
+.watch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.watch-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.watch-chip-all .watch-chip-dot { display: none; }
+.watch-chip-watched .watch-chip-dot { background: var(--watch-green); box-shadow: 0 0 6px var(--watch-green-glow); }
+.watch-chip-unwatched .watch-chip-dot { border: 1px solid var(--text-dim); }
+.watch-chip-watchlist .watch-chip-dot { background: var(--watch-blue); box-shadow: 0 0 6px rgba(90, 190, 255, 0.7); }
+
+.watch-chip-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.watch-chip.active .watch-chip-count { background: rgba(255, 255, 255, 0.18); color: #fff; }
+
+.watch-filter-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+#discover-series-filter-status { margin-bottom: 18px; }
+#discover-series-empty { margin-top: 8px; }
+
+/* ---------- Marvel Travel ---------- */
+.mcu-poster-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+}
+
+.watch-badge-mini {
+  top: auto;
+  left: auto;
+  right: -6px;
+  bottom: -6px;
+  width: 21px;
+  height: 21px;
+  z-index: 2;
+}
+
+.watch-badge-mini svg { width: 12px; height: 12px; }
+
+.mcu-item.is-watched .mcu-dot {
+  background: var(--watch-green);
+  box-shadow: 0 0 10px 3px var(--watch-green-glow);
+}
+
+/* Dezente Markierung der Karte; ::before ist bereits das Szenenbild */
+.mcu-item.watch-travel::after {
+  content: "";
+  position: absolute;
+  /* vertikal innerhalb des Eintrags, damit sich benachbarte Markierungen nicht überlappen */
+  inset: 3px -10px;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  border: 1px solid rgba(61, 220, 132, 0.2);
+  background: linear-gradient(90deg, rgba(61, 220, 132, 0.1), rgba(61, 220, 132, 0.015) 75%);
+  transition: opacity 0.3s ease;
+}
+
+.mcu-item.left.watch-travel::after {
+  background: linear-gradient(270deg, rgba(61, 220, 132, 0.1), rgba(61, 220, 132, 0.015) 75%);
+}
+
+.mcu-item.is-watched::after { opacity: 1; }
+
+.watch-btn-pill {
+  align-self: flex-start;
+  margin-top: 6px;
+  min-height: 32px;
+  padding: 0 12px 0 8px;
+  font-size: 9px;
+}
+
+.mcu-item.left .watch-btn-pill { align-self: flex-end; }
+
+.watch-travel-progress {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(61, 220, 132, 0.25);
+  background: rgba(61, 220, 132, 0.06);
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.wtp-label { color: var(--watch-green); font-weight: 700; letter-spacing: 2px; }
+.wtp-value strong { color: #fff; }
+
+.wtp-bar {
+  width: 74px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.wtp-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1fa95e, var(--watch-green));
+  box-shadow: 0 0 8px var(--watch-green-glow);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.watch-travel-progress.is-complete { border-color: rgba(245, 196, 81, 0.5); background: rgba(245, 196, 81, 0.08); }
+.watch-travel-progress.is-complete .wtp-label { color: #f5c451; }
+.watch-travel-progress.is-complete .wtp-bar i { background: linear-gradient(90deg, #d9a43a, #ffe08f); box-shadow: 0 0 8px rgba(245, 196, 81, 0.8); }
+
+/* Fortschrittsanzeige sitzt rechts in der Umschalt-Zeile und rutscht bei
+   wenig Platz in eine eigene Zeile (die beiden Modus-Knöpfe passen immer) */
+#travel-toggle {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 10px;
+}
+
+/* ---------- Universum-Panel: Filmliste ---------- */
+.movie-list li.watch-row {
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.25s ease;
+}
+
+.movie-list li.watch-row.is-watched {
+  background: linear-gradient(90deg, rgba(61, 220, 132, 0.09), rgba(255, 255, 255, 0.03) 70%);
+  box-shadow: inset 0 0 0 1px rgba(61, 220, 132, 0.14);
+}
+
+.watch-btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  flex: 0 0 32px;
+}
+
+.watch-btn-icon svg { width: 17px; height: 17px; }
+
+.watch-soon-tag {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff5a3c, #ff8a4c);
+  flex-shrink: 0;
+}
+
+.watch-row.is-upcoming .watch-soon-tag { display: inline-block; }
+
+/* ---------- Universum-Panel: Fortschritt ---------- */
+#panel-progress { margin: 0 0 26px; }
+
+.pp-card {
+  --pp-color: var(--accent-color, var(--accent));
+  position: relative;
+  padding: 14px 16px 15px;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--pp-color) 16%, transparent), transparent 60%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01));
+  border: 1px solid color-mix(in srgb, var(--pp-color) 30%, transparent);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.pp-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pp-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--pp-color);
+  line-height: 1.3;
+}
+
+.pp-percent {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--pp-color) 55%, transparent);
+  white-space: nowrap;
+}
+
+.pp-percent small {
+  font-size: 12px;
+  margin-left: 2px;
+  color: var(--text-dim);
+  text-shadow: none;
+}
+
+.pp-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.pp-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--pp-color) 45%, #05060c) 0%,
+    var(--pp-color) 75%,
+    color-mix(in srgb, var(--pp-color) 55%, #fff) 100%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--pp-color) 70%, transparent);
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+/* Lichtreflex, der über den Balken wandert */
+.pp-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  left: -40px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: ppSheen 3.6s ease-in-out 1.2s infinite;
+}
+
+@keyframes ppSheen {
+  0% { left: -40px; }
+  45%, 100% { left: 100%; }
+}
+
+/* Markierungen bei 25 / 50 / 75 % (Effektstufen der Planeten) */
+.pp-tick {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+.pp-card.tier-2 .pp-fill,
+.pp-card.tier-3 .pp-fill {
+  box-shadow: 0 0 16px color-mix(in srgb, var(--pp-color) 85%, transparent);
+}
+
+.pp-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 11px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+}
+
+.pp-row strong { color: #fff; font-weight: 600; }
+
+.pp-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #ffa58c;
+}
+
+.pp-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 5px 11px;
+  border-radius: 14px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #1a1204;
+  background: linear-gradient(135deg, #ffe08f, #f5c451 55%, #d9a43a);
+  box-shadow: 0 0 16px rgba(245, 196, 81, 0.55);
+}
+
+/* 100 %: goldener Abschluss */
+.pp-card.is-complete {
+  --pp-color: #f5c451;
+  border-color: rgba(245, 196, 81, 0.55);
+  box-shadow: 0 0 26px -10px rgba(245, 196, 81, 0.7), inset 0 0 24px rgba(245, 196, 81, 0.06);
+}
+
+.pp-card.is-complete .pp-fill {
+  background: linear-gradient(90deg, #a87a1e, #f5c451 60%, #fff1c2);
+  box-shadow: 0 0 16px rgba(245, 196, 81, 0.85);
+}
+
+/* Noch keine Titel erschienen: Balken im Bereitschaftsmodus */
+.pp-card.is-pending .pp-bar {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 6px, rgba(255, 255, 255, 0) 6px 12px),
+    rgba(0, 0, 0, 0.42);
+}
+
+.pp-card.is-pending .pp-percent { color: var(--text-dim); text-shadow: none; }
+
+/* ---------- Film-Detail ---------- */
+.watch-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 14px;
+}
+
+.watch-btn-lg {
+  min-height: 36px;
+  padding: 0 14px 0 11px;
+  font-size: 10px;
+  border-radius: 18px;
+  background: rgba(8, 9, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.watch-btn-lg svg { width: 17px; height: 17px; }
+
+.watch-stars-lg { margin: 0 0 0 2px; }
+.watch-stars-lg .watch-star { flex: 0 0 32px; height: 36px; }
+.watch-stars-lg .watch-star svg { width: 20px; height: 20px; }
+.watch-stars-lg.is-locked { opacity: 0.35; }
+/* Vor dem Kinostart gibt es nichts zu bewerten — der Hinweis erklärt es */
+.watch-modal-actions.is-upcoming .watch-stars { display: none; }
+
+.watch-hint {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.watch-hint:empty { display: none; }
+
+/* ---------- Responsive ---------- */
+@media (pointer: coarse) {
+  .watch-chip { min-height: 32px; }
+}
+
+@media (max-width: 640px) {
+  .mcu-item.left .watch-btn-pill { align-self: flex-start; }
+  .mcu-item.left.watch-travel::after {
+    background: linear-gradient(90deg, rgba(61, 220, 132, 0.1), rgba(61, 220, 132, 0.015) 75%);
+  }
+  /* Modus-Knöpfe bleiben wie bisher nebeneinander (teilen sich die Zeile),
+     die Fortschrittsanzeige bekommt eine eigene Zeile */
+  #travel-toggle button { flex: 1 1 0; min-width: 0; max-width: max-content; }
+  .watch-travel-progress { flex: 1 0 100%; margin-left: 0; }
+  .watch-travel-progress .wtp-bar { flex: 1 1 auto; width: auto; }
+  .watch-modal-actions { margin-top: 10px; }
+}
+
+@media (max-width: 560px) {
+  .watch-btn { font-size: 9px; letter-spacing: 0.7px; padding: 0 8px; gap: 5px; }
+  .watch-btn svg { width: 14px; height: 14px; }
+  .watch-actions .watch-btn-list { flex-basis: 32px; padding: 0; }
+  .watch-badge-seen { top: 6px; left: 6px; width: 23px; height: 23px; }
+  .watch-badge-seen svg { width: 13px; height: 13px; }
+  .watch-badge-mini { top: auto; left: auto; width: 20px; height: 20px; }
+  .watch-badge-soon { top: 6px; left: 6px; font-size: 7.5px; padding: 3px 6px; letter-spacing: 1px; }
+  .watch-badge-list { right: 7px; width: 19px; height: 26px; }
+  .watch-filter-label { flex-basis: 100%; margin-bottom: -2px; }
+  .watch-btn-lg { min-height: 34px; padding: 0 12px 0 9px; font-size: 9.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-fill::after { display: none; }
+  .watch-btn svg { animation: none !important; }
+}

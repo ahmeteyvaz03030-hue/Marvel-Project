@@ -643,6 +643,326 @@
       .toUpperCase();
   }
 
+  // ---------- Gesehen / Watchlist / Bewertung (gemeinsame Bausteine) ----------
+  // Entdecken, Marvel Travel, Universum-Panel und Film-Detail lesen denselben
+  // Stand aus window.MarvelProgress (keine eigenen Speicherstände). Jedes
+  // gebundene Element trägt data-watch-id; bei einer Änderung werden genau
+  // diese Elemente abgeglichen (Klassen, aria-pressed, Sterne) — Karten und
+  // Poster bleiben stehen und werden nie neu gebaut oder neu geladen.
+  const Watch = (function () {
+    const P = window.MarvelProgress || null;
+
+    const ICONS = {
+      seen:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="wi-ring" cx="12" cy="12" r="9"/><path class="wi-check" d="M7.7 12.4l2.9 2.9 5.7-6.1"/></svg>',
+      check:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="wi-check" d="M6.2 12.6l3.7 3.7 7.9-8.4"/></svg>',
+      bookmark:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="wi-mark" d="M7 3.6h10a1.2 1.2 0 0 1 1.2 1.2v15.6L12 16.5l-6.2 3.9V4.8A1.2 1.2 0 0 1 7 3.6z"/></svg>',
+      star:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="wi-star" d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/></svg>',
+    };
+
+    const STATUS_FILTERS = [
+      { id: "all", label: "Alle" },
+      { id: "watched", label: "Gesehen" },
+      { id: "unwatched", label: "Ungesehen" },
+      { id: "watchlist", label: "Watchlist" },
+    ];
+
+    function signedIn() {
+      return Boolean(P && P.profile());
+    }
+
+    // "2026-12-18" → "18.12.2026" (ohne Datum: Erscheinungsjahr)
+    function releaseLabel(entry) {
+      if (!entry) return "";
+      if (entry.releaseDate) {
+        const d = new Date(entry.releaseDate + (entry.releaseDate.length <= 10 ? "T00:00:00" : ""));
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        }
+      }
+      return String(entry.year || "");
+    }
+
+    // ---------- Markup-Bausteine (Zustand setzt apply()) ----------
+    function seenButtonHTML(variant) {
+      return `<button type="button" class="watch-btn watch-btn-seen${variant ? " watch-btn-" + variant : ""}" data-watch-action="seen" data-variant="${variant || "card"}" aria-pressed="false">${ICONS.seen}<span class="watch-btn-label">Gesehen</span></button>`;
+    }
+
+    function listButtonHTML(variant) {
+      const label = variant === "lg" ? '<span class="watch-btn-label">Watchlist</span>' : "";
+      return `<button type="button" class="watch-btn watch-btn-list${variant ? " watch-btn-" + variant : ""}" data-watch-action="list" data-variant="${variant || "card"}" aria-pressed="false">${ICONS.bookmark}${label}</button>`;
+    }
+
+    function starsHTML(variant) {
+      let html = `<div class="watch-stars${variant ? " watch-stars-" + variant : ""}" role="group">`;
+      for (let n = 1; n <= 5; n++) {
+        html += `<button type="button" class="watch-star" data-watch-action="star" data-star="${n}" aria-pressed="false" aria-label="Mit ${n} von 5 Sternen bewerten">${ICONS.star}</button>`;
+      }
+      return html + "</div>";
+    }
+
+    // Poster-Overlay der Entdecken-Karten: liegt neben (nicht in) .film-poster,
+    // weil loadPosterInto den Poster-Inhalt beim Nachladen ersetzt.
+    function posterBadgesHTML() {
+      return `<div class="watch-badges" aria-hidden="true">
+          <span class="watch-badge watch-badge-seen">${ICONS.check}</span>
+          <span class="watch-badge watch-badge-list">${ICONS.bookmark}</span>
+          <span class="watch-badge watch-badge-soon">Demnächst</span>
+        </div>`;
+    }
+
+    function cardActionsHTML() {
+      return `<div class="watch-actions">
+          <div class="watch-actions-row">${seenButtonHTML("")}${listButtonHTML("")}</div>
+          ${starsHTML("")}
+        </div>`;
+    }
+
+    function miniBadgeHTML() {
+      return `<span class="watch-badge watch-badge-seen watch-badge-mini" aria-hidden="true">${ICONS.check}</span>`;
+    }
+
+    function pillHTML() {
+      return `<button type="button" class="watch-btn watch-btn-seen watch-btn-pill" data-watch-action="seen" data-variant="pill" aria-pressed="false">${ICONS.seen}<span class="watch-btn-label">Gesehen</span></button>`;
+    }
+
+    function iconButtonHTML() {
+      return `<button type="button" class="watch-btn watch-btn-seen watch-btn-icon" data-watch-action="seen" data-variant="icon" aria-pressed="false">${ICONS.seen}</button>`;
+    }
+
+    function modalActionsHTML() {
+      return `${seenButtonHTML("lg")}${listButtonHTML("lg")}${starsHTML("lg")}<span class="watch-hint" aria-live="polite"></span>`;
+    }
+
+    // ---------- Zustand ins DOM übertragen ----------
+    function apply(node) {
+      const id = node.getAttribute("data-watch-id");
+      const entry = P && id ? P.get(id) : null;
+      const on = signedIn() && Boolean(entry);
+      const released = entry ? P.isReleased(entry) : true;
+      const watched = on && P.isWatched(id);
+      const listed = on && P.inWatchlist(id);
+      const stars = watched ? P.rating(id) : 0;
+      const title = entry ? entry.title : "";
+      const when = entry && !released ? releaseLabel(entry) : "";
+
+      node.classList.toggle("is-watched", watched);
+      node.classList.toggle("is-listed", listed);
+      node.classList.toggle("is-upcoming", Boolean(entry) && !released);
+      node.classList.toggle("is-rated", stars > 0);
+
+      node.querySelectorAll('[data-watch-action="seen"]').forEach((btn) => {
+        const variant = btn.getAttribute("data-variant");
+        btn.disabled = !released;
+        btn.setAttribute("aria-pressed", watched ? "true" : "false");
+        btn.setAttribute("aria-label", `Gesehen: ${title}`);
+        btn.title = !released
+          ? `Erscheint am ${when}`
+          : watched
+          ? "Gesehen — erneut klicken entfernt die Markierung"
+          : "Als gesehen markieren";
+        const label = btn.querySelector(".watch-btn-label");
+        if (label) {
+          label.textContent = released ? "Gesehen" : variant === "lg" ? `Erscheint am ${when}` : `Ab ${when}`;
+        }
+      });
+
+      node.querySelectorAll('[data-watch-action="list"]').forEach((btn) => {
+        btn.setAttribute("aria-pressed", listed ? "true" : "false");
+        btn.setAttribute("aria-label", `Watchlist: ${title}`);
+        btn.title = listed ? "Von der Watchlist entfernen" : "Zur Watchlist hinzufügen";
+        const label = btn.querySelector(".watch-btn-label");
+        if (label) label.textContent = listed ? "Auf der Watchlist" : "Watchlist";
+      });
+
+      node.querySelectorAll(".watch-stars").forEach((group) => {
+        group.classList.toggle("is-locked", !watched);
+        group.setAttribute("aria-disabled", watched ? "false" : "true");
+        group.setAttribute(
+          "aria-label",
+          watched
+            ? `Bewertung für ${title}: ${stars ? stars + " von 5 Sternen" : "noch nicht bewertet"}`
+            : `Bewertung für ${title} — erst nach dem Ansehen möglich`
+        );
+        group.title = !watched
+          ? released
+            ? "Erst als gesehen markieren, dann bewerten"
+            : `Bewertung ab dem Kinostart am ${when}`
+          : stars
+          ? `${stars} von 5 Sternen — Klick auf den aktuellen Stern entfernt die Bewertung`
+          : "Jetzt bewerten";
+        group.querySelectorAll(".watch-star").forEach((star) => {
+          const n = Number(star.getAttribute("data-star"));
+          star.classList.toggle("is-on", n <= stars);
+          star.setAttribute("aria-pressed", n === stars ? "true" : "false");
+        });
+      });
+
+      const hint = node.querySelector(".watch-hint");
+      if (hint) {
+        hint.textContent = !released
+          ? "Auf die Watchlist setzen und am Kinostart als gesehen markieren."
+          : watched
+          ? ""
+          : "Als gesehen markieren, um zu bewerten.";
+      }
+    }
+
+    function sync(id) {
+      document.body.classList.toggle("watch-signed-out", !signedIn());
+      const selector = id ? `[data-watch-id="${id}"]` : "[data-watch-id]";
+      document.querySelectorAll(selector).forEach(apply);
+    }
+
+    // ---------- Aktionen ----------
+    function handleClick(e) {
+      // Aktions-Klicks dürfen die Karte (Film-Detail / Serien-Info) nie öffnen —
+      // auch nicht der Zwischenraum zwischen den Knöpfen.
+      e.stopPropagation();
+      const btn = e.target.closest("[data-watch-action]");
+      if (!btn || !e.currentTarget.contains(btn) || !P) return;
+      const root = btn.closest("[data-watch-id]");
+      const id = root ? root.getAttribute("data-watch-id") : null;
+      const entry = id ? P.get(id) : null;
+      if (!entry) return;
+      if (!signedIn()) {
+        showToast("Bitte zuerst ein Profil wählen.");
+        return;
+      }
+      const action = btn.getAttribute("data-watch-action");
+      if (action === "seen") {
+        if (!P.isReleased(entry)) {
+          showToast(`📅 ${entry.title} erscheint am ${releaseLabel(entry)} — danach kannst du ihn als gesehen markieren.`, 4200);
+          return;
+        }
+        P.toggleWatched(id);
+      } else if (action === "list") {
+        P.toggleWatchlist(id);
+      } else if (action === "star") {
+        if (!P.isWatched(id)) {
+          showToast(
+            P.isReleased(entry)
+              ? `Markiere „${entry.title}“ zuerst als gesehen, um ihn zu bewerten.`
+              : `„${entry.title}“ kann erst nach dem Kinostart bewertet werden.`
+          );
+          return;
+        }
+        const n = Number(btn.getAttribute("data-star")) || 0;
+        P.setRating(id, P.rating(id) === n ? 0 : n);
+      }
+      Sound.playClick();
+    }
+
+    // Sterne-Vorschau beim Überfahren (nur Maus, damit auf Touch nichts hängen bleibt)
+    function bindStarPreview(group) {
+      group.addEventListener("pointerover", (e) => {
+        if (e.pointerType !== "mouse" || group.classList.contains("is-locked")) return;
+        const star = e.target.closest(".watch-star");
+        if (!star) return;
+        const n = Number(star.getAttribute("data-star"));
+        group.classList.add("is-previewing");
+        group.querySelectorAll(".watch-star").forEach((s) => {
+          s.classList.toggle("is-preview", Number(s.getAttribute("data-star")) <= n);
+        });
+      });
+      group.addEventListener("pointerleave", () => {
+        group.classList.remove("is-previewing");
+        group.querySelectorAll(".is-preview").forEach((s) => s.classList.remove("is-preview"));
+      });
+    }
+
+    function bind(container) {
+      if (!container) return;
+      container.addEventListener("click", handleClick);
+      if (container.classList.contains("watch-stars")) bindStarPreview(container);
+      container.querySelectorAll(".watch-stars").forEach(bindStarPreview);
+    }
+
+    // ---------- Status-Filter (Alle / Gesehen / Ungesehen / Watchlist) ----------
+    function matchesStatus(id, status) {
+      if (!status || status === "all" || !signedIn()) return true;
+      if (!id) return false;
+      if (status === "watched") return P.isWatched(id);
+      if (status === "unwatched") return !P.isWatched(id);
+      if (status === "watchlist") return P.inWatchlist(id);
+      return true;
+    }
+
+    function statusCounts(ids) {
+      const counts = { all: ids.length, watched: 0, unwatched: 0, watchlist: 0 };
+      if (!signedIn()) return counts;
+      ids.forEach((id) => {
+        if (!id) return;
+        if (P.isWatched(id)) counts.watched++;
+        else counts.unwatched++;
+        if (P.inWatchlist(id)) counts.watchlist++;
+      });
+      return counts;
+    }
+
+    // Baut die Chips einmalig und aktualisiert danach nur Text/Zustand
+    // (Fokus bleibt bei Live-Aktualisierungen erhalten).
+    function renderStatusChips(row, active, counts, onSelect) {
+      if (!row) return;
+      if (!row.hasAttribute("data-watch-built")) {
+        row.setAttribute("data-watch-built", "");
+        row.classList.add("watch-filter-row");
+        row.setAttribute("role", "group");
+        row.setAttribute("aria-label", "Nach Status filtern");
+        row.innerHTML =
+          '<span class="watch-filter-label" aria-hidden="true">Status</span>' +
+          STATUS_FILTERS.map(
+            (s) =>
+              `<button type="button" class="discover-chip watch-chip watch-chip-${s.id}" data-status="${s.id}" aria-pressed="false"><span class="watch-chip-dot" aria-hidden="true"></span><span class="watch-chip-text">${s.label}</span><span class="watch-chip-count"></span></button>`
+          ).join("");
+        row.addEventListener("click", (e) => {
+          const chip = e.target.closest("[data-status]");
+          if (chip && row.contains(chip)) onSelect(chip.getAttribute("data-status"));
+        });
+      }
+      row.querySelectorAll("[data-status]").forEach((chip) => {
+        const s = chip.getAttribute("data-status");
+        chip.classList.toggle("active", s === active);
+        chip.setAttribute("aria-pressed", s === active ? "true" : "false");
+        chip.querySelector(".watch-chip-count").textContent = String(counts[s] || 0);
+      });
+    }
+
+    function isRelevant(ev) {
+      return ["profile", "sync", "watched", "watchlist", "rating"].indexOf(ev && ev.type) !== -1;
+    }
+
+    if (P) {
+      P.subscribe((ev) => {
+        if (ev.type === "profile" || ev.type === "sync") sync();
+        else if (isRelevant(ev)) sync(ev.id);
+      });
+    }
+    document.body.classList.toggle("watch-signed-out", !signedIn());
+
+    return {
+      P,
+      signedIn,
+      releaseLabel,
+      posterBadgesHTML,
+      cardActionsHTML,
+      miniBadgeHTML,
+      pillHTML,
+      iconButtonHTML,
+      modalActionsHTML,
+      apply,
+      sync,
+      bind,
+      matchesStatus,
+      statusCounts,
+      renderStatusChips,
+      isRelevant,
+    };
+  })();
+
   // ---------- Marvel Travel (MCU-Chronologie) ----------
   function initTravel() {
     const btn = document.getElementById("travel-btn");
@@ -699,20 +1019,32 @@
           // ins Kino) — für die TMDB-Suche wird deshalb immer das echte
           // Kinostart-Jahr verwendet, sonst findet TMDB keinen Treffer.
           const tmdbYear = MarvelDerive.releaseYearFor(f.title) || f.year;
+          // Gemeinsamer Gesehen-Status (dieselbe Katalog-ID wie in Entdecken)
+          const watchId = Watch.P ? Watch.P.idFor(f.title, tmdbYear, "movie") : null;
 
           const item = document.createElement("div");
           item.className =
-            "mcu-item reveal " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "");
+            "mcu-item reveal " + (side === 0 ? "left" : "right") + (f.finale ? " finale" : "") +
+            (watchId ? " watch-travel" : "");
           item.style.setProperty("--item-color", color);
+          if (watchId) item.setAttribute("data-watch-id", watchId);
           item.innerHTML = `
             <span class="mcu-dot"></span>
-            <div class="mcu-poster">${posterAbbrev(f.title)}</div>
+            <div class="mcu-poster-wrap">
+              <div class="mcu-poster">${posterAbbrev(f.title)}</div>
+              ${watchId ? Watch.miniBadgeHTML() : ""}
+            </div>
             <div class="mcu-card">
               <span class="mcu-year">${f.year}${phase && mode !== "release" ? ` · ${phase}` : ""}</span>
               <span class="mcu-title">${f.title}</span>
               ${desc ? `<span class="mcu-desc">${desc}</span>` : ""}
               ${f.note ? `<span class="mcu-note">${f.note}</span>` : ""}
+              ${watchId ? Watch.pillHTML() : ""}
             </div>`;
+          if (watchId) {
+            Watch.bind(item.querySelector(".watch-btn-pill"));
+            Watch.apply(item);
+          }
           container.appendChild(item);
 
           // Echtes Poster nachladen, Kürzel bleibt als Fallback stehen.
@@ -769,7 +1101,48 @@
       });
     });
 
+    // Kleine Fortschrittsangabe im Kopf ("MCU: 12 / 37 gesehen"); gezählt
+    // werden nur bereits erschienene Filme der Kinostart-Liste.
+    const mcuWatchIds = [];
+    if (Watch.P) {
+      MCU_TIMELINE.forEach((group) => {
+        group.films.forEach((f) => {
+          const id = Watch.P.idFor(f.title, f.year, "movie");
+          if (id && mcuWatchIds.indexOf(id) === -1) mcuWatchIds.push(id);
+        });
+      });
+    }
+    let travelProgressEl = null;
+
+    function updateTravelProgress() {
+      if (!Watch.P || !mcuWatchIds.length) return;
+      if (!travelProgressEl) {
+        travelProgressEl = document.createElement("div");
+        travelProgressEl.className = "watch-travel-progress";
+        travelProgressEl.setAttribute("role", "status");
+        travelProgressEl.innerHTML = `
+          <span class="wtp-label">MCU</span>
+          <span class="wtp-value"></span>
+          <span class="wtp-bar" aria-hidden="true"><i></i></span>`;
+        document.getElementById("travel-toggle").appendChild(travelProgressEl);
+      }
+      const released = mcuWatchIds.filter((id) => Watch.P.isReleased(id));
+      const watched = released.filter((id) => Watch.P.isWatched(id)).length;
+      const pct = Watch.P.percent(watched, released.length);
+      travelProgressEl.hidden = !Watch.signedIn();
+      travelProgressEl.classList.toggle("is-complete", released.length > 0 && watched >= released.length);
+      travelProgressEl.querySelector(".wtp-value").innerHTML = `<strong>${watched}</strong> / ${released.length} gesehen`;
+      travelProgressEl.querySelector(".wtp-bar i").style.width = pct + "%";
+      travelProgressEl.title = `${pct} % der erschienenen MCU-Filme gesehen`;
+    }
+
     render("story");
+    updateTravelProgress();
+    if (Watch.P) {
+      Watch.P.subscribe((ev) => {
+        if (Watch.isRelevant(ev)) updateTravelProgress();
+      });
+    }
 
     storyBtn.addEventListener("click", () => {
       storyBtn.classList.add("active");
@@ -846,9 +1219,12 @@
     });
 
     // ---------- Filme-Tab ----------
-    const movieState = { query: "", universe: "all", phase: "all", sort: "year-asc" };
+    const movieState = { query: "", universe: "all", phase: "all", sort: "year-asc", status: "all" };
     let moviesBuilt = false;
     const movieCards = new Map(); // key -> Karten-Element (wird nie neu erzeugt, nur verschoben/versteckt)
+    // key -> Katalog-ID im gemeinsamen Fortschritt (gesehen / Watchlist / Bewertung)
+    const filmWatchIds = new Map();
+    films.forEach((f) => filmWatchIds.set(f.key, Watch.P ? Watch.P.idFor(f.title, f.year, "movie") : null));
 
     function buildMovieGrid() {
       if (moviesBuilt) return;
@@ -861,16 +1237,24 @@
               ? `<span class="film-universe-tag">${f.phase}</span>`
               : ""
             : `<span class="film-universe-tag">${labelFor(f)}</span>`;
+        const watchId = filmWatchIds.get(f.key);
         const card = document.createElement("div");
-        card.className = "film-card";
+        card.className = "film-card" + (watchId ? " watch-card" : "");
+        if (watchId) card.setAttribute("data-watch-id", watchId);
         card.innerHTML = `
           <div class="film-poster"><span class="film-abbrev">${posterAbbrev(f.title)}</span></div>
+          ${watchId ? Watch.posterBadgesHTML() : ""}
           <div class="film-meta">
             <span class="film-title">${f.title}</span>
             <span class="film-year">${f.year}</span>
             ${tag}
-          </div>`;
+          </div>
+          ${watchId ? Watch.cardActionsHTML() : ""}`;
         card.addEventListener("click", () => openFilmModal(f.title, f.year));
+        if (watchId) {
+          Watch.bind(card.querySelector(".watch-actions"));
+          Watch.apply(card);
+        }
         grid.appendChild(card);
         // Reuse dieselbe Poster-/Cache-Logik wie Marvel Travel & Filmgrids.
         loadPosterInto(card.querySelector(".film-poster"), f.title, f.year);
@@ -933,33 +1317,56 @@
       return arr;
     }
 
-    function filterFilms() {
+    // status: optional abweichender Status-Filter (für die Anzahl an den Chips)
+    function filterFilms(status) {
       const q = movieState.query.trim().toLowerCase();
+      const st = status || movieState.status;
       return films.filter((f) => {
         if (movieState.universe !== "all" && f.universeId !== movieState.universe) return false;
         if (movieState.phase !== "all" && f.phase !== movieState.phase) return false;
         if (q && f.title.toLowerCase().indexOf(q) === -1) return false;
+        if (!Watch.matchesStatus(filmWatchIds.get(f.key), st)) return false;
         return true;
       });
     }
 
+    // Status-Zeile: die Anzahl je Chip bezieht sich auf die übrigen aktiven
+    // Filter (Universum, Phase, Suche) — also genau das, was ein Klick zeigt.
+    function renderMovieStatusFilters() {
+      const base = filterFilms("all");
+      Watch.renderStatusChips(
+        document.getElementById("discover-filter-status"),
+        movieState.status,
+        Watch.statusCounts(base.map((f) => filmWatchIds.get(f.key))),
+        (status) => {
+          movieState.status = status;
+          renderMovies();
+          Sound.playClick();
+        }
+      );
+    }
+
     // Sortiert/filtert nur die einmalig gebauten Karten neu (verschiebt
     // bestehende DOM-Knoten statt sie neu zu erzeugen) — Poster werden dabei
-    // nie erneut nachgeladen oder erneut bei TMDB gesucht.
-    function renderMovies() {
+    // nie erneut nachgeladen oder erneut bei TMDB gesucht. keepOrder: nur
+    // Sichtbarkeit abgleichen (Live-Aktualisierung; der Fokus bleibt erhalten).
+    function renderMovies(keepOrder) {
       buildMovieGrid();
       const grid = document.getElementById("discover-grid");
       const empty = document.getElementById("discover-empty");
       const count = document.getElementById("discover-count");
       const list = sortFilms(filterFilms());
       const visible = new Set(list.map((f) => f.key));
-      list.forEach((f) => {
-        const card = movieCards.get(f.key);
-        if (card) grid.appendChild(card);
-      });
+      if (keepOrder !== true) {
+        list.forEach((f) => {
+          const card = movieCards.get(f.key);
+          if (card) grid.appendChild(card);
+        });
+      }
       movieCards.forEach((card, key) => card.classList.toggle("hidden", !visible.has(key)));
       empty.classList.toggle("hidden", list.length > 0);
       count.textContent = `${list.length} Film${list.length === 1 ? "" : "e"}`;
+      renderMovieStatusFilters();
     }
 
     document.getElementById("discover-search").addEventListener("input", (e) => {
@@ -975,6 +1382,7 @@
       movieState.universe = "all";
       movieState.phase = "all";
       movieState.sort = "year-asc";
+      movieState.status = "all";
       document.getElementById("discover-search").value = "";
       document.getElementById("discover-sort").value = "year-asc";
       renderMovieFilters();
@@ -986,20 +1394,34 @@
 
     // ---------- Serien-Tab (bestehende TMDB.seriesPoster-Anbindung aus der Suche) ----------
     let seriesBuilt = false;
+    const seriesState = { status: "all" };
+    const seriesList = typeof SERIES !== "undefined" ? SERIES : [];
+    const seriesWatchIds = seriesList.map((sr) => (Watch.P ? Watch.P.idFor(sr.title, sr.year, "series") : null));
+    const seriesCards = [];
+
     function buildSeriesGrid() {
       if (seriesBuilt) return;
       seriesBuilt = true;
       const grid = document.getElementById("discover-series-grid");
-      (typeof SERIES !== "undefined" ? SERIES : []).forEach((sr) => {
+      seriesList.forEach((sr, idx) => {
+        const watchId = seriesWatchIds[idx];
         const card = document.createElement("div");
-        card.className = "film-card";
+        card.className = "film-card" + (watchId ? " watch-card" : "");
+        if (watchId) card.setAttribute("data-watch-id", watchId);
         card.innerHTML = `
           <div class="film-poster"><span class="film-abbrev">${posterAbbrev(sr.title)}</span></div>
+          ${watchId ? Watch.posterBadgesHTML() : ""}
           <div class="film-meta">
             <span class="film-title">${sr.title}</span>
             <span class="film-year">${sr.year}${sr.phase ? " · " + sr.phase : ""}</span>
-          </div>`;
+          </div>
+          ${watchId ? Watch.cardActionsHTML() : ""}`;
         card.addEventListener("click", () => showToast(`📺 ${sr.title} (${sr.year}) — ${sr.desc}`, 5200));
+        if (watchId) {
+          Watch.bind(card.querySelector(".watch-actions"));
+          Watch.apply(card);
+        }
+        seriesCards.push(card);
         grid.appendChild(card);
         if (window.TMDB && TMDB.enabled()) {
           const posterEl = card.querySelector(".film-poster");
@@ -1012,6 +1434,51 @@
             })
             .catch(() => {});
         }
+      });
+    }
+
+    // Status-Filter und eigene kleine Anzahl für die Serien (gleiche Karten,
+    // nur ein-/ausgeblendet).
+    function renderSeries() {
+      buildSeriesGrid();
+      const row = document.getElementById("discover-series-filter-status");
+      Watch.renderStatusChips(row, seriesState.status, Watch.statusCounts(seriesWatchIds), (status) => {
+        seriesState.status = status;
+        renderSeries();
+        Sound.playClick();
+      });
+      let visible = 0;
+      seriesCards.forEach((card, idx) => {
+        const show = Watch.matchesStatus(seriesWatchIds[idx], seriesState.status);
+        card.classList.toggle("hidden", !show);
+        if (show) visible++;
+      });
+      let countEl = row.querySelector(".watch-filter-count");
+      if (!countEl) {
+        countEl = document.createElement("span");
+        countEl.className = "watch-filter-count";
+        countEl.id = "discover-series-count";
+        row.appendChild(countEl);
+      }
+      countEl.textContent = `${visible} Serie${visible === 1 ? "" : "n"}`;
+      let empty = document.getElementById("discover-series-empty");
+      if (!empty) {
+        empty = document.createElement("p");
+        empty.id = "discover-series-empty";
+        empty.className = "travel-sub";
+        empty.textContent = "Keine Serien gefunden.";
+        document.getElementById("discover-series-grid").after(empty);
+      }
+      empty.classList.toggle("hidden", visible > 0);
+    }
+
+    // Live-Aktualisierung: Zustände der Karten gleicht Watch.sync ab; hier
+    // nur Sichtbarkeit (aktiver Status-Filter) und Anzahlen.
+    if (Watch.P) {
+      Watch.P.subscribe((ev) => {
+        if (!Watch.isRelevant(ev)) return;
+        if (moviesBuilt) renderMovies(true);
+        if (seriesBuilt) renderSeries();
       });
     }
 
@@ -1056,7 +1523,7 @@
       tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
       Object.keys(views).forEach((key) => views[key].classList.toggle("hidden", key !== tab));
       if (tab === "movies") renderMovies();
-      else if (tab === "series") buildSeriesGrid();
+      else if (tab === "series") renderSeries();
       else if (tab === "characters") buildCharactersGrid();
     }
 
@@ -4406,6 +4873,29 @@
   // ---------- Film-Detailansicht ----------
   let filmToken = 0;
 
+  // Gesehen / Watchlist / Sterne für genau diesen Film. Ohne Katalogeintrag
+  // (oder ohne Profil, siehe watch.css) bleibt der Bereich verborgen; die
+  // Live-Aktualisierung übernimmt Watch.sync über data-watch-id.
+  function renderFilmWatchActions(title, year) {
+    const box = document.getElementById("film-progress-actions");
+    if (!box) return;
+    const entry = Watch.P ? Watch.P.resolve(title, year, "movie") : null;
+    if (!entry) {
+      box.hidden = true;
+      box.removeAttribute("data-watch-id");
+      return;
+    }
+    if (!box.hasAttribute("data-watch-built")) {
+      box.setAttribute("data-watch-built", "");
+      box.classList.add("watch-modal-actions");
+      box.innerHTML = Watch.modalActionsHTML();
+      Watch.bind(box);
+    }
+    box.setAttribute("data-watch-id", entry.id);
+    box.hidden = false;
+    Watch.apply(box);
+  }
+
   function openFilmModal(title, year, lookupYear) {
     Sound.playClick();
     filmToken++;
@@ -4511,6 +5001,8 @@
     document.getElementById("film-characters-section").hidden = entries.length === 0;
     renderRelationChips(charWrap, entries.slice(0, 16), null, "Keine Figuren hinterlegt.");
 
+    renderFilmWatchActions(title, tmdbYear);
+
     openOverlay(modal);
   }
 
@@ -4577,6 +5069,116 @@
           })
           .catch(() => {});
       });
+  }
+
+  // ---------- Universum-Panel: persönlicher Fortschritt ----------
+  // Zahlen aus MarvelProgress.universeStats (ein Film in mehreren Universen
+  // zählt dort in jedem). Noch nicht erschienene Titel zählen nicht zur
+  // Gesamtzahl und werden separat erwähnt; ohne verfügbare Titel gibt es
+  // statt "0 / 0" einen Hinweis auf den Kinostart.
+  let panelWatchUniverse = null;
+
+  function renderPanelProgress(u, rebuild) {
+    const section = document.getElementById("panel-progress");
+    if (!section || !u) return;
+    panelWatchUniverse = u;
+    if (!Watch.P || !Watch.signedIn()) {
+      section.hidden = true;
+      return;
+    }
+    const P = Watch.P;
+    const st = P.universeStats(u.id);
+    const fresh = rebuild || section.getAttribute("data-universe") !== u.id;
+    if (fresh) {
+      section.setAttribute("data-universe", u.id);
+      section.innerHTML = `
+        <h3>Fortschritt</h3>
+        <div class="pp-card">
+          <div class="pp-head">
+            <span class="pp-name"></span>
+            <span class="pp-percent"></span>
+          </div>
+          <div class="pp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <span class="pp-fill"></span>
+            <span class="pp-tick" style="left:25%"></span>
+            <span class="pp-tick" style="left:50%"></span>
+            <span class="pp-tick" style="left:75%"></span>
+          </div>
+          <div class="pp-rows"></div>
+          <p class="pp-note"></p>
+          <div class="pp-complete">★ Universum abgeschlossen</div>
+        </div>`;
+    }
+    const card = section.querySelector(".pp-card");
+    const total = st.all.total;
+    const pending = total === 0;
+    const pct = st.all.percent;
+
+    card.style.setProperty("--pp-color", u.accent);
+    card.classList.toggle("is-complete", st.complete);
+    card.classList.toggle("is-pending", pending);
+    for (let t = 0; t <= 4; t++) card.classList.toggle("tier-" + t, st.tier === t);
+
+    section.querySelector(".pp-name").textContent = `${String(u.name).split(" — ")[0]} Universum`;
+    section.querySelector(".pp-percent").innerHTML = pending ? "—" : `${pct}<small>%</small>`;
+
+    const rows = [];
+    if (st.movies.total > 0) {
+      rows.push(`<span class="pp-row">Filme: <strong>${st.movies.watched} / ${st.movies.total}</strong> gesehen</span>`);
+    } else if (st.movies.upcoming > 0) {
+      rows.push('<span class="pp-row">Filme: <strong>noch nicht erschienen</strong></span>');
+    }
+    if (st.series.total > 0) {
+      rows.push(`<span class="pp-row">Serien: <strong>${st.series.watched} / ${st.series.total}</strong> gesehen</span>`);
+    } else if (st.series.upcoming > 0) {
+      rows.push('<span class="pp-row">Serien: <strong>noch nicht erschienen</strong></span>');
+    }
+    section.querySelector(".pp-rows").innerHTML = rows.join("");
+
+    const upcoming = st.entries.filter((e) => !P.isReleased(e));
+    const dates = upcoming
+      .map((e) => Watch.releaseLabel(e))
+      .filter((d, i, arr) => d && arr.indexOf(d) === i);
+    const dateText = dates.length === 1 ? `am ${dates[0]}` : "demnächst";
+    let note = "";
+    if (pending) {
+      note = upcoming.length
+        ? `Der Fortschritt startet mit dem Kinostart ${dateText} — bis dahin kannst du ${upcoming.length === 1 ? "den Film" : "die Titel"} auf die Watchlist setzen.`
+        : "Für dieses Universum sind noch keine Titel verfügbar.";
+    } else if (upcoming.length) {
+      note = `${upcoming.length} Titel ${upcoming.length === 1 ? "erscheint" : "erscheinen"} ${dateText} und ${upcoming.length === 1 ? "zählt" : "zählen"} erst ab dann mit.`;
+    }
+    const noteEl = section.querySelector(".pp-note");
+    noteEl.textContent = note;
+    noteEl.hidden = !note;
+    section.querySelector(".pp-complete").hidden = !st.complete;
+
+    const bar = section.querySelector(".pp-bar");
+    bar.setAttribute("aria-valuenow", String(pending ? 0 : pct));
+    bar.setAttribute(
+      "aria-valuetext",
+      pending ? "Noch keine Titel erschienen" : `${st.all.watched} von ${total} Titeln gesehen (${pct} %)`
+    );
+    const fill = section.querySelector(".pp-fill");
+    // Zielbreite am Element merken: eine Änderung während der Einblendung
+    // gewinnt gegen den verzögerten ersten Wert.
+    fill.setAttribute("data-target", (pending ? 0 : pct) + "%");
+    if (fresh && !reduceMotion) {
+      // Beim Öffnen des Planeten von 0 auf den aktuellen Stand auffüllen
+      fill.style.width = "0%";
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => (fill.style.width = fill.getAttribute("data-target")))
+      );
+    } else {
+      fill.style.width = fill.getAttribute("data-target");
+    }
+    section.hidden = false;
+  }
+
+  if (Watch.P) {
+    Watch.P.subscribe((ev) => {
+      if (panelWatchUniverse && Watch.isRelevant(ev)) renderPanelProgress(panelWatchUniverse, false);
+    });
   }
 
   function fillPanel(u) {
@@ -4698,17 +5300,27 @@
     const movieList = document.getElementById("panel-movies");
     movieList.innerHTML = "";
     u.movies.forEach((m) => {
+      const watchId = Watch.P ? Watch.P.idFor(m.title, m.year, "movie") : null;
       const li = document.createElement("li");
       li.style.setProperty("--accent-color", u.accent);
-      li.className = "clickable";
+      li.className = "clickable" + (watchId ? " watch-row" : "");
+      if (watchId) li.setAttribute("data-watch-id", watchId);
       li.innerHTML = `
         <span class="mposter">${posterAbbrev(m.title)}</span>
         <span class="mtitle">${m.title}</span>
-        <span class="myear">${m.year}</span>`;
+        ${watchId ? '<span class="watch-soon-tag">Demnächst</span>' : ""}
+        <span class="myear">${m.year}</span>
+        ${watchId ? Watch.iconButtonHTML() : ""}`;
       loadPosterInto(li.querySelector(".mposter"), m.title, m.year);
       li.addEventListener("click", () => openFilmModal(m.title, m.year));
+      if (watchId) {
+        Watch.bind(li.querySelector(".watch-btn-icon"));
+        Watch.apply(li);
+      }
       movieList.appendChild(li);
     });
+
+    renderPanelProgress(u, true);
   }
 
   // ---------- Resize ----------
