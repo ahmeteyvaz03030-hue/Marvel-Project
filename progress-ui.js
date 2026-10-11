@@ -315,10 +315,12 @@ window.MarvelProgressUI = (function () {
   let bumpTimer = 0;
 
   // ---------- Infinity-Steine: eigene kleine HUD-Anzeige am Widget ----------
-  // Standard: rechtsbündig direkt unter dem Widget. Auf Smartphones (hoch und
-  // quer) liegen dort Planeten-Beschriftungen — dann links neben dem Widget.
+  // Standard (und Smartphone quer): rechtsbündig direkt unter dem Widget.
+  // Smartphone hochkant: darunter beginnen die Planeten-Beschriftungen (ab
+  // 128 px) — dort links neben dem Widget, bündig mit dessen Oberkante.
   const stonesEl = document.getElementById("stones-tracker");
-  const stonesSideMQ = window.matchMedia("(max-width: 640px), (max-height: 480px) and (orientation: landscape)");
+  const stonesLandscapeMQ = window.matchMedia("(max-height: 480px) and (orientation: landscape)");
+  const stonesSideMQ = window.matchMedia("(max-width: 640px)");
   const STONES_GAP = 8;
 
   function placeStones() {
@@ -327,11 +329,12 @@ window.MarvelProgressUI = (function () {
     const w = widget.offsetWidth;
     if (!w) return;
     const viewW = document.documentElement.clientWidth || window.innerWidth;
-    if (stonesSideMQ.matches) {
-      stonesEl.style.top = Math.round(widget.offsetTop + (widget.offsetHeight - stonesEl.offsetHeight) / 2) + "px";
+    if (stonesSideMQ.matches && !stonesLandscapeMQ.matches) {
+      stonesEl.style.top = Math.round(widget.offsetTop + 2) + "px";
       stonesEl.style.right = Math.round(viewW - widget.offsetLeft + STONES_GAP) + "px";
     } else {
-      stonesEl.style.top = Math.round(widget.offsetTop + widget.offsetHeight + STONES_GAP) + "px";
+      const gap = stonesLandscapeMQ.matches ? 5 : STONES_GAP;
+      stonesEl.style.top = Math.round(widget.offsetTop + widget.offsetHeight + gap) + "px";
       stonesEl.style.right = Math.round(viewW - widget.offsetLeft - w) + "px";
     }
   }
@@ -340,8 +343,10 @@ window.MarvelProgressUI = (function () {
     if (!stonesEl || !widget) return;
     placeStones();
     window.addEventListener("resize", placeStones);
-    if (stonesSideMQ.addEventListener) stonesSideMQ.addEventListener("change", placeStones);
-    else if (stonesSideMQ.addListener) stonesSideMQ.addListener(placeStones);
+    [stonesSideMQ, stonesLandscapeMQ].forEach((mq) => {
+      if (mq.addEventListener) mq.addEventListener("change", placeStones);
+      else if (mq.addListener) mq.addListener(placeStones);
+    });
     // Größe des Widgets (Zahlen, Schrift) oder der Steine-Zeile ändert sich
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(placeStones);
