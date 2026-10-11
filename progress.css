@@ -295,6 +295,21 @@ body.panel-open #stones-tracker {
   pointer-events: none;
 }
 
+/* Smartphone quer: Planeten-Beschriftungen beginnen bei 100 px — die Steine
+   bleiben kompakt und enden direkt unter dem Widget darüber. */
+@media (max-height: 480px) and (orientation: landscape) {
+  #stones-tracker {
+    padding: 2px 6px;
+    gap: 4px;
+    border-radius: 10px;
+  }
+
+  #stones-tracker .stone-dot {
+    width: 7px;
+    height: 7px;
+  }
+}
+
 /* 100 %: goldener Abschluss */
 #progress-widget.is-complete {
   --pw-accent: #f5c451;

@@ -333,7 +333,7 @@ window.MarvelProgressUI = (function () {
       stonesEl.style.top = Math.round(widget.offsetTop + 2) + "px";
       stonesEl.style.right = Math.round(viewW - widget.offsetLeft + STONES_GAP) + "px";
     } else {
-      const gap = stonesLandscapeMQ.matches ? 5 : STONES_GAP;
+      const gap = stonesLandscapeMQ.matches ? 3 : STONES_GAP;
       stonesEl.style.top = Math.round(widget.offsetTop + widget.offsetHeight + gap) + "px";
       stonesEl.style.right = Math.round(viewW - widget.offsetLeft - w) + "px";
     }
