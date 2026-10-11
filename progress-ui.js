@@ -604,7 +604,8 @@ window.MarvelProgressUI = (function () {
       "</div>" +
       "</section>" +
       '<section class="mp-section">' +
-      '<div class="mp-section-head"><h3>Universen</h3><span>' + s.universesCompleted + " / " + s.universesTotal + " abgeschlossen</span></div>" +
+      '<div class="mp-section-head"><h3>Universen</h3><span>' + s.universesCompleted + " / " + s.universesTotal + " abgeschlossen" +
+      (s.universesUpcoming ? " · +" + s.universesUpcoming + " demnächst" : "") + "</span></div>" +
       '<div class="ps-universes">' + s.universes.map(universeCardHTML).join("") + "</div>" +
       "</section>" +
       '<section class="mp-section">' +
@@ -864,7 +865,8 @@ window.MarvelProgressUI = (function () {
         "🌌",
         "Universen abgeschlossen",
         s.universesCompleted + "<small> / " + s.universesTotal + "</small>",
-        barHTML(P.percent(s.universesCompleted, s.universesTotal), s.universesTotal > 0 && s.universesCompleted >= s.universesTotal)
+        barHTML(P.percent(s.universesCompleted, s.universesTotal), s.universesTotal > 0 && s.universesCompleted >= s.universesTotal) +
+          (s.universesUpcoming ? '<span class="pd-tile-foot">+' + s.universesUpcoming + " demnächst</span>" : "")
       ) +
       tileHTML(
         "🏆",
@@ -1053,6 +1055,12 @@ window.MarvelProgressUI = (function () {
       batch.watched = 0;
       batch.universes = [];
       batch.achievements = [];
+      if (ev.type === "profile") {
+        // Meldungen des vorherigen Profils nicht ins neue Profil (oder über
+        // das Login-Gate) mitnehmen; die Drosselung gilt pro Sitzung.
+        if (toastStack) toastStack.querySelectorAll(".jv-toast").forEach(dismissToast);
+        lastProgressToast = 0;
+      }
       if (ev.type === "profile" && !ev.profile) {
         // Beim Abmelden sofort schließen, nicht erst nach dem Microtask
         closeStats(false);

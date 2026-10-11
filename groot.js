@@ -1494,6 +1494,7 @@
         hit.style.left = hit.style.top = "0px";
         hit.style.width = viewW + "px";
         hit.style.height = viewH + "px";
+        hit.style.clipPath = "";
         return;
       }
       fig.updateMatrixWorld(true);
@@ -1520,6 +1521,32 @@
       hit.style.top = y0.toFixed(0) + "px";
       hit.style.width = (x1 - x0).toFixed(0) + "px";
       hit.style.height = (y1 - y0).toFixed(0) + "px";
+
+      // Klickbar ist nur die Figur (mittlere Säule) und die flache Plattform —
+      // der transparente Raum neben Kopf, Ästen und Armen lässt Klicks zur
+      // 3D-Szene (Planeten, Drehen) durch. clip-path begrenzt auch das Hit-Testing.
+      const c = projectToPx(_corner.set(0, 0.05, 0));
+      const rx = Math.abs(projectToPx(_corner.set(PLAT_R * 0.98, 0.05, 0)).x - c.x);
+      const ry = Math.max(4, Math.abs(projectToPx(_corner.set(0, 0.05, PLAT_R * 0.98)).y - c.y));
+      // Mitte etwas tiefer und großzügiger, damit auch die Vorderkante der
+      // (dicken) Plattform klickbar ist
+      const cx = c.x - x0;
+      const cy = c.y - y0 + ry * 0.25;
+      const rxs = rx * 1.04;
+      const rys = ry * 1.35 + 4;
+      const half = Math.min(rxs * 0.92, Math.max(14, (x1 - x0) * 0.24));
+      const colL = cx - half;
+      const colR = cx + half;
+      const tR = Math.acos(clamp((colR - cx) / rxs, -1, 1));
+      const tL = Math.acos(clamp((colL - cx) / rxs, -1, 1));
+      const pts = [colL + "px 0px", colR + "px 0px"];
+      const steps = 14;
+      const span = tR + (2 * Math.PI - tL);
+      for (let i = 0; i <= steps; i++) {
+        const t = tR - (span * i) / steps;
+        pts.push((cx + rxs * Math.cos(t)).toFixed(1) + "px " + (cy - rys * Math.sin(t)).toFixed(1) + "px");
+      }
+      hit.style.clipPath = "polygon(" + pts.join(", ") + ")";
     }
 
     const _headTop = new THREE.Vector3();
@@ -1890,10 +1917,13 @@
         let ex = P.elbow + (reduce ? 0 : Math.sin(t * 0.8 + i * 2.1) * 0.05);
         if (s === waveSide && waveK > 0) {
           const osc = Math.sin(wave.t * 13.0);
-          rz = lerp(rz, s * 2.55, waveK);
+          // Großer Groot: Oberarm unten lassen und den Unterarm vorn hochklappen —
+          // sonst ragt die Hand im festen Desktop-Ausschnitt über den Canvas-Rand.
+          const big = compact ? 0 : smoothstep(1.0, 2.5, anim.g);
+          rz = lerp(rz, s * lerp(2.55, 0.3, big), waveK);
           rx = lerp(rx, -0.25, waveK);
-          ez = lerp(0, s * (0.55 + osc * 0.4), waveK);
-          ex = lerp(ex, -0.15, waveK);
+          ez = lerp(0, s * (lerp(0.55, 0.2, big) + osc * lerp(0.4, 0.3, big)), waveK);
+          ex = lerp(ex, lerp(-0.15, -2.4, big), waveK);
         }
         arm.armRoot.rotation.set(rx, 0, rz);
         arm.elbow.rotation.set(ex, 0, ez);

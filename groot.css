@@ -275,14 +275,19 @@ body.panel-open #groot-widget {
   color: rgba(154, 161, 196, 0.85);
 }
 
-/* ---------- Smartphone hochkant: kompaktes rundes Widget links über dem Profil ---------- */
+/* ---------- Smartphone hochkant: kompakter Groot im Fortschritts-Widget oben rechts ----------
+   Unten links lag er auf schmalen/niedrigen Phones über dem Avengers-Planeten und
+   unter dem Trailer-Mini-Player. Im Fortschritts-Widget (top 95px, right 12px,
+   168px breit, links 54px für Groot reserviert — siehe progress.css) ist fester
+   HUD-Platz, und thematisch passt es: Groot wächst mit genau diesem Fortschritt. */
 @media (max-width: 640px) {
   #groot-widget {
-    left: 12px;
-    right: auto;
-    bottom: 148px;
-    width: 60px;
-    height: 60px;
+    left: auto;
+    right: calc(12px + 168px - 7px - 42px);
+    top: 99px;
+    bottom: auto;
+    width: 42px;
+    height: 42px;
     aspect-ratio: auto;
     border-radius: 50%;
     border: 1px solid rgba(110, 230, 170, 0.45);
@@ -305,18 +310,21 @@ body.panel-open #groot-widget {
   .groot-canvas { border-radius: 50%; }
   .groot-hit { border-radius: 50%; }
 
+  /* Sprechblase und HUD öffnen nach unten, rechtsbündig mit dem Widget */
   .groot-bubble {
     left: 0;
     right: auto;
-    bottom: calc(100% + 10px);
-    border-radius: 14px 14px 14px 4px;
-    transform-origin: 0 100%;
+    top: calc(100% + 12px);
+    bottom: auto;
+    border-radius: 4px 14px 14px 14px;
+    transform-origin: 0 0;
   }
 
   .groot-hud {
-    left: 0;
-    right: auto;
-    bottom: calc(100% + 10px);
+    left: auto;
+    right: calc(-1 * (168px - 7px - 42px));
+    top: calc(100% + 14px);
+    bottom: auto;
     width: min(280px, calc(100vw - 24px));
   }
 

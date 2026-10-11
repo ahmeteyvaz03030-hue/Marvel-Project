@@ -399,8 +399,11 @@ window.MarvelProgress = (function () {
       series,
       all: total,
       universes,
+      // Wie bei den Titeln zählen nur Universen mit bereits erschienenen Titeln
+      // (Doomsday kommt mit dem Kinostart automatisch hinzu).
       universesCompleted: universes.filter((x) => x.complete).length,
-      universesTotal: universes.length,
+      universesTotal: universes.filter((x) => x.all.total > 0).length,
+      universesUpcoming: universes.filter((x) => x.all.total === 0).length,
       averageRating: ratingCount ? ratingSum / ratingCount : null,
       ratingCount,
       recent,

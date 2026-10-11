@@ -1499,6 +1499,13 @@ body.panel-open #progress-widget {
   .pw-title { letter-spacing: 1.9px; }
 }
 
+/* Bei diesen Breiten reicht der große Seitentitel (clamp 4vw, Orbitron) bis an
+   die linke obere Ecke des Widgets — etwas tiefer setzen. Die Unterkante bleibt
+   dank der entfallenen Steine-Zeile etwa dort, wo sie vorher war. */
+@media (min-width: 1101px) and (max-width: 1320px) {
+  #progress-widget { top: 92px; }
+}
+
 /* Tablets quer / kleine Laptops: Suche sitzt bei top 16px / right 16px */
 @media (max-width: 1100px) and (min-width: 641px) {
   #progress-widget {
@@ -1601,7 +1608,9 @@ body.panel-open #progress-widget {
     top: 95px;
     right: 12px;
     width: 168px;
-    padding: 6px 10px 5px;
+    min-height: 50px;
+    /* links Platz für den kompakten Groot (groot.css) */
+    padding: 6px 10px 5px 56px;
     border-radius: 12px;
   }
 

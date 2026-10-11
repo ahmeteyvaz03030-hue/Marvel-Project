@@ -1338,13 +1338,23 @@
     // wird (Zeiger oder Fokus darauf), nicht unter dem Klick — sonst rückt die
     // nächste Karte nach und ein Doppelklick träfe sie. Sie bleibt abgedimmt
     // stehen, bis Zeiger und Fokus sie verlassen haben.
+    // Nur Tastatur-Fokus zählt: nach einem Mausklick behält der Knopf zwar den
+    // Fokus, die Karte soll aber verschwinden, sobald der Zeiger sie verlässt.
+    function keyboardFocusIn(card) {
+      try {
+        return Boolean(card.querySelector(":focus-visible"));
+      } catch (e) {
+        return card.contains(document.activeElement);
+      }
+    }
+
     function setCardVisible(card, show, live, rerender) {
       if (show || !live || card.classList.contains("hidden")) {
         card.classList.remove("is-leaving");
         card.classList.toggle("hidden", !show);
         return;
       }
-      const engaged = () => card.matches(":hover") || card.contains(document.activeElement);
+      const engaged = () => card.matches(":hover") || keyboardFocusIn(card);
       if (!engaged()) {
         card.classList.remove("is-leaving");
         card.classList.add("hidden");
@@ -1354,7 +1364,7 @@
       card.classList.add("is-leaving");
       const settle = () => {
         if (!card.classList.contains("is-leaving")) return cleanup();
-        if (card.contains(document.activeElement)) return;
+        if (keyboardFocusIn(card)) return;
         cleanup();
         rerender();
       };
