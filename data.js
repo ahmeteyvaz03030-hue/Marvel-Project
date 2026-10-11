@@ -263,20 +263,25 @@ const FILM_INFO = {
 };
 
 // Disney+-Serien: ergänzen Suche und Detailpanel um das Serien-Universum.
+// universes: inhaltlich passende Planeten-Universen (über die dort geführten
+// Hauptfiguren). Eine Serie darf zu mehreren Universen gehören, zählt im
+// Gesamtfortschritt aber nur einmal. Serien ohne klaren Bezug bleiben ohne
+// Zuordnung. mcu: false für Serien außerhalb des MCU.
 const SERIES = [
-  { title: "WandaVision", year: 2021, phase: "Phase 4", desc: "Wanda erschafft aus Trauer eine Sitcom-Realität — und hält eine ganze Stadt gefangen." },
-  { title: "The Falcon and the Winter Soldier", year: 2021, phase: "Phase 4", desc: "Sam und Bucky streiten um das Erbe des Schildes." },
-  { title: "Loki", year: 2021, phase: "Phase 4", desc: "Eine Loki-Variante landet bei der TVA und bringt die heilige Zeitlinie zum Einsturz." },
+  { title: "WandaVision", year: 2021, phase: "Phase 4", universes: ["avengers"], desc: "Wanda erschafft aus Trauer eine Sitcom-Realität — und hält eine ganze Stadt gefangen." },
+  { title: "The Falcon and the Winter Soldier", year: 2021, phase: "Phase 4", universes: ["avengers", "thunderbolts"], desc: "Sam und Bucky streiten um das Erbe des Schildes." },
+  { title: "Loki", year: 2021, phase: "Phase 4", universes: ["avengers"], desc: "Eine Loki-Variante landet bei der TVA und bringt die heilige Zeitlinie zum Einsturz." },
   { title: "What If…?", year: 2021, phase: "Phase 4", desc: "Der Watcher zeigt Realitäten, in denen alles anders lief." },
-  { title: "Hawkeye", year: 2021, phase: "Phase 4", desc: "Clint Barton will Weihnachten feiern und bekommt stattdessen Kate Bishop." },
+  { title: "Hawkeye", year: 2021, phase: "Phase 4", universes: ["avengers"], desc: "Clint Barton will Weihnachten feiern und bekommt stattdessen Kate Bishop." },
   { title: "Moon Knight", year: 2022, phase: "Phase 4", desc: "Ein Museumsangestellter teilt sich Körper und Leben mit einem ägyptischen Mondritter." },
   { title: "Ms. Marvel", year: 2022, phase: "Phase 4", desc: "Eine Teenagerin aus Jersey City entdeckt kosmische Kräfte in einem Familienerbstück." },
   { title: "She-Hulk: Die Anwältin", year: 2022, phase: "Phase 4", desc: "Jennifer Walters verklagt, verteidigt — und wird dabei grün." },
-  { title: "Secret Invasion", year: 2023, phase: "Phase 5", desc: "Nick Fury jagt Skrull-Rebellen, die sich überall eingeschlichen haben." },
+  { title: "Secret Invasion", year: 2023, phase: "Phase 5", universes: ["avengers"], desc: "Nick Fury jagt Skrull-Rebellen, die sich überall eingeschlichen haben." },
   { title: "Echo", year: 2024, phase: "Phase 5", desc: "Maya Lopez kehrt zu ihren Wurzeln zurück und bricht mit Kingpin." },
   { title: "Agatha All Along", year: 2024, phase: "Phase 5", desc: "Agatha Harkness sammelt einen Hexenzirkel für den Weg der Prüfungen." },
   { title: "Daredevil: Born Again", year: 2025, phase: "Phase 5", desc: "Matt Murdock und Wilson Fisk treffen in einem neuen New York aufeinander." },
   { title: "Ironheart", year: 2025, phase: "Phase 5", desc: "Riri Williams baut die nächste Generation gepanzerter Technik — und trifft auf Magie." },
+  { title: "X-Men '97", year: 2024, phase: "", mcu: false, universes: ["xmen"], desc: "Nach Professor X' Tod führt Cyclops die X-Men — die Fortsetzung der legendären Zeichentrickserie der 90er." },
 ];
 
 // Datengrundlage für alle Marvel-Universen, die als Planeten dargestellt werden.

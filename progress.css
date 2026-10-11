@@ -281,40 +281,18 @@ body.panel-open #progress-widget {
   transform: translateX(2px);
 }
 
-/* Infinity-Steine (Sammel-Easter-Egg) im Statistik-Overlay. Überschreibt die
-   frühere eigenständige fixed-Position oben rechts aus style.css (inkl. aller
-   Media Queries dort). */
-.ps-stones {
-  display: flex;
-  align-items: center;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+/* Infinity-Steine: eigene kleine HUD-Anzeige am Widget. Aussehen kommt aus
+   style.css, die Position (top/right) setzt progress-ui.js. Ohne Profil und bei
+   offenem Universum-Panel tritt sie — wie das Widget — zurück. */
+#stones-tracker {
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-#stats-overlay #stones-tracker {
-  position: static;
-  top: auto;
-  right: auto;
-  z-index: auto;
-  display: flex;
-  gap: 12px;
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: 0;
-  backdrop-filter: none;
-}
-
-#stats-overlay #stones-tracker .stone-dot {
-  width: 14px;
-  height: 14px;
-}
-
-#stats-overlay #stones-tracker .stone-dot.collected {
-  cursor: pointer;
-  box-shadow: 0 0 10px 2px var(--stone-color);
+#stones-tracker.stones-off,
+body.panel-open #stones-tracker {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* 100 %: goldener Abschluss */

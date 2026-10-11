@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
 // Fortschritts-Oberfläche (HUD)
 //
-// - Multiverse-Progress-Widget oben rechts (#progress-widget); es ersetzt die
-//   frühere Infinity-Steine-Anzeige. Die Steine (#stones-tracker, gefüllt von
-//   script.js) leben als Easter-Egg-Abschnitt in der Statistik weiter.
+// - Multiverse-Progress-Widget oben rechts (#progress-widget). Die Infinity-
+//   Steine (#stones-tracker, gefüllt von script.js) bleiben eine eigene kleine
+//   HUD-Anzeige, deren Position hier am Widget ausgerichtet wird.
 // - Ausführliche Statistik (#stats-overlay) und persönliches Profil-Dashboard
 //   (#profile-dashboard) als Vollbild-Overlays.
 // - J.A.R.V.I.S.-Benachrichtigungen im vorhandenen #toast-layer.
@@ -314,6 +314,43 @@ window.MarvelProgressUI = (function () {
   let countFrame = 0;
   let bumpTimer = 0;
 
+  // ---------- Infinity-Steine: eigene kleine HUD-Anzeige am Widget ----------
+  // Standard: rechtsbündig direkt unter dem Widget. Auf Smartphones (hoch und
+  // quer) liegen dort Planeten-Beschriftungen — dann links neben dem Widget.
+  const stonesEl = document.getElementById("stones-tracker");
+  const stonesSideMQ = window.matchMedia("(max-width: 640px), (max-height: 480px) and (orientation: landscape)");
+  const STONES_GAP = 8;
+
+  function placeStones() {
+    if (!stonesEl || !widget) return;
+    // offset*-Werte ignorieren die Einblend-Transformation des Widgets
+    const w = widget.offsetWidth;
+    if (!w) return;
+    const viewW = document.documentElement.clientWidth || window.innerWidth;
+    if (stonesSideMQ.matches) {
+      stonesEl.style.top = Math.round(widget.offsetTop + (widget.offsetHeight - stonesEl.offsetHeight) / 2) + "px";
+      stonesEl.style.right = Math.round(viewW - widget.offsetLeft + STONES_GAP) + "px";
+    } else {
+      stonesEl.style.top = Math.round(widget.offsetTop + widget.offsetHeight + STONES_GAP) + "px";
+      stonesEl.style.right = Math.round(viewW - widget.offsetLeft - w) + "px";
+    }
+  }
+
+  function initStones() {
+    if (!stonesEl || !widget) return;
+    placeStones();
+    window.addEventListener("resize", placeStones);
+    if (stonesSideMQ.addEventListener) stonesSideMQ.addEventListener("change", placeStones);
+    else if (stonesSideMQ.addListener) stonesSideMQ.addListener(placeStones);
+    // Größe des Widgets (Zahlen, Schrift) oder der Steine-Zeile ändert sich
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(placeStones);
+      ro.observe(widget);
+      ro.observe(stonesEl);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeStones);
+  }
+
   function buildWidget() {
     if (!widget) return;
     widget.setAttribute("role", "button");
@@ -392,6 +429,7 @@ window.MarvelProgressUI = (function () {
   function renderWidget(s) {
     if (!widget || !W.pct) return;
     const profile = P.profile();
+    if (stonesEl) stonesEl.classList.toggle("stones-off", !profile || !s);
     if (!profile || !s) {
       widget.classList.add("hidden");
       widgetProfile = null;
@@ -449,16 +487,7 @@ window.MarvelProgressUI = (function () {
       '<h2 id="ps-title" class="mp-title">Multiverse Progress</h2>' +
       '<p class="travel-sub mp-sub" data-slot="sub"></p>' +
       '<div data-slot="body"></div>' +
-      // Fester Abschnitt (wird beim Aktualisieren nicht neu aufgebaut): die
-      // Infinity-Steine des Sammel-Easter-Eggs, früher oben rechts auf der Startseite.
-      '<section class="mp-section ps-stones-section">' +
-      '<div class="mp-section-head"><h3>Infinity-Steine</h3><span>Easter Egg · versteckt in der 3D-Szene</span></div>' +
-      '<div class="ps-stones" data-slot="stones"></div>' +
-      "</section>" +
       "</div>";
-    const stones = document.getElementById("stones-tracker");
-    const stonesSlot = statsEl.querySelector('[data-slot="stones"]');
-    if (stones && stonesSlot) stonesSlot.appendChild(stones);
 
     statsEl.addEventListener("click", (e) => {
       if (e.target === statsEl) {
@@ -1094,6 +1123,7 @@ window.MarvelProgressUI = (function () {
 
   // ---------- Start ----------
   buildWidget();
+  initStones();
   buildStats();
   buildDashboard();
   initProfileTriggers();

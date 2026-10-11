@@ -120,10 +120,12 @@ window.MarvelProgress = (function () {
       });
     }
 
-    // 3) Disney+-Serien
+    // 3) Disney+-Serien, inkl. ihrer Universums-Zuordnung (SERIES[].universes)
     if (typeof SERIES !== "undefined") {
       SERIES.forEach((sr) => {
-        add("series", sr.title, sr.year, { phase: sr.phase, mcu: true, releaseDate: sr.releaseDate });
+        const extra = { phase: sr.phase, mcu: sr.mcu !== false, releaseDate: sr.releaseDate };
+        add("series", sr.title, sr.year, extra);
+        (sr.universes || []).forEach((uid) => add("series", sr.title, sr.year, { universe: uid }));
       });
     }
 

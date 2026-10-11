@@ -7,10 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=35">
-<link rel="stylesheet" href="progress.css?v=35">
-<link rel="stylesheet" href="watch.css?v=35">
-<link rel="stylesheet" href="groot.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="progress.css?v=36">
+<link rel="stylesheet" href="watch.css?v=36">
+<link rel="stylesheet" href="groot.css?v=36">
 </head>
 <body>
 
@@ -78,11 +78,12 @@
     <button id="profile-logout" title="Abmelden">⏻</button>
   </div>
 
-  <!-- Multiverse-Progress-Widget (ersetzt die frühere Einzelanzeige oben rechts;
-       die Infinity-Steine-Anzeige lebt als kleine Zeile darin weiter). Inhalt: progress-ui.js -->
-  <div id="progress-widget" class="hidden">
-    <div id="stones-tracker" class="hidden" title="Infinity-Steine gesammelt"></div>
-  </div>
+  <!-- Multiverse-Progress-Widget oben rechts. Inhalt: progress-ui.js -->
+  <div id="progress-widget" class="hidden"></div>
+
+  <!-- Infinity-Steine (Sammel-Easter-Egg) als eigene kleine HUD-Anzeige am
+       Widget; die Position setzt progress-ui.js passend zum Widget -->
+  <div id="stones-tracker" class="hidden stones-off" title="Infinity-Steine gesammelt"></div>
 
   <div id="toast-layer"></div>
 
@@ -313,6 +314,10 @@
         <h3>Filme</h3>
         <ol id="panel-movies" class="movie-list"></ol>
       </section>
+      <section class="panel-section" id="panel-series-section" hidden>
+        <h3>Serien</h3>
+        <ol id="panel-series" class="movie-list"></ol>
+      </section>
 
       <section class="panel-section" id="panel-related-films-section">
         <h3>Verwandte Filme</h3>
@@ -482,15 +487,15 @@
 
   <script src="vendor/three.min.js"></script>
   <script src="vendor/OrbitControls.js"></script>
-  <script src="config.js?v=35"></script>
-  <script src="tmdb.js?v=35"></script>
-  <script src="data.js?v=35"></script>
-  <script src="derive.js?v=35"></script>
-  <script src="progress.js?v=35"></script>
-  <script src="auth.js?v=35"></script>
-  <script src="scene-shaders.js?v=35"></script>
-  <script src="script.js?v=35"></script>
-  <script src="progress-ui.js?v=35"></script>
-  <script src="groot.js?v=35"></script>
+  <script src="config.js?v=36"></script>
+  <script src="tmdb.js?v=36"></script>
+  <script src="data.js?v=36"></script>
+  <script src="derive.js?v=36"></script>
+  <script src="progress.js?v=36"></script>
+  <script src="auth.js?v=36"></script>
+  <script src="scene-shaders.js?v=36"></script>
+  <script src="script.js?v=36"></script>
+  <script src="progress-ui.js?v=36"></script>
+  <script src="groot.js?v=36"></script>
 </body>
 </html>

@@ -633,7 +633,7 @@
   const POSTER_SKIP_WORDS = ["the", "of", "and", "a", "to", "in"];
   function posterAbbrev(title) {
     const words = String(title)
-      .replace(/[:*]/g, "")
+      .replace(/[:*'’]/g, "")
       .split(" ")
       .filter((w) => w && POSTER_SKIP_WORDS.indexOf(w.toLowerCase()) === -1);
     return words
@@ -2153,7 +2153,7 @@
       (typeof SERIES !== "undefined" ? SERIES : []).map((sr) => ({
         type: "series",
         label: sr.title,
-        sub: `${sr.year} · ${sr.phase}`,
+        sub: `${sr.year} · ${sr.phase || "Serie"}`,
         series: sr,
       }))
     );
@@ -5628,6 +5628,40 @@
         Watch.apply(li);
       }
       movieList.appendChild(li);
+    });
+
+    // Serien dieses Universums (Zuordnung SERIES[].universes in data.js)
+    const seriesSection = document.getElementById("panel-series-section");
+    const seriesListEl = document.getElementById("panel-series");
+    const uniSeries = Watch.P ? Watch.P.catalog().filter((e) => e.type === "series" && e.universes.indexOf(u.id) !== -1) : [];
+    seriesListEl.innerHTML = "";
+    seriesSection.hidden = uniSeries.length === 0;
+    uniSeries.forEach((entry) => {
+      const sr = (typeof SERIES !== "undefined" ? SERIES : []).find((x) => x.title === entry.title && x.year === entry.year);
+      const li = document.createElement("li");
+      li.style.setProperty("--accent-color", u.accent);
+      li.className = "clickable watch-row";
+      li.setAttribute("data-watch-id", entry.id);
+      li.innerHTML = `
+        <span class="mposter">${posterAbbrev(entry.title)}</span>
+        <span class="mtitle">${entry.title}</span>
+        <span class="watch-soon-tag">Demnächst</span>
+        <span class="myear">${entry.year}</span>
+        ${Watch.iconButtonHTML()}`;
+      if (window.TMDB && TMDB.enabled()) {
+        const posterEl = li.querySelector(".mposter");
+        TMDB.seriesPoster(entry.title, entry.year)
+          .then((url) => (url ? preload(url) : null))
+          .then((url) => {
+            if (url && posterEl.isConnected) posterEl.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(entry.title)}" loading="lazy">`;
+          })
+          .catch(() => {});
+      }
+      // Eine Serien-Detailansicht gibt es nicht — wie in Entdecken kurz informieren.
+      li.addEventListener("click", () => showToast(`📺 ${entry.title} (${entry.year})${sr && sr.desc ? " — " + sr.desc : ""}`, 5200));
+      Watch.bind(li.querySelector(".watch-btn-icon"));
+      Watch.apply(li);
+      seriesListEl.appendChild(li);
     });
 
     renderPanelProgress(u, true);
