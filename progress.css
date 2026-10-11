@@ -281,34 +281,25 @@ body.panel-open #progress-widget {
   transform: translateX(2px);
 }
 
-/* Infinity-Steine: kleine, dezente Zeile (Sammel-Easter-Egg) */
-.pw-stones {
+/* Infinity-Steine (Sammel-Easter-Egg) im Statistik-Overlay. Überschreibt die
+   frühere eigenständige fixed-Position oben rechts aus style.css (inkl. aller
+   Media Queries dort). */
+.ps-stones {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 6px;
-  padding-top: 5px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: default;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.pw-stones-label {
-  font-family: var(--font-display);
-  font-size: 7.5px;
-  letter-spacing: 1.8px;
-  color: rgba(154, 161, 196, 0.75);
-}
-
-/* Überschreibt die frühere eigenständige fixed-Position aus style.css
-   (inkl. aller Media Queries dort). */
-#progress-widget #stones-tracker {
+#stats-overlay #stones-tracker {
   position: static;
   top: auto;
   right: auto;
   z-index: auto;
   display: flex;
-  gap: 5px;
+  gap: 12px;
   padding: 0;
   background: none;
   border: 0;
@@ -316,14 +307,14 @@ body.panel-open #progress-widget {
   backdrop-filter: none;
 }
 
-#progress-widget #stones-tracker .stone-dot {
-  width: 8px;
-  height: 8px;
+#stats-overlay #stones-tracker .stone-dot {
+  width: 14px;
+  height: 14px;
 }
 
-#progress-widget #stones-tracker .stone-dot.collected {
+#stats-overlay #stones-tracker .stone-dot.collected {
   cursor: pointer;
-  box-shadow: 0 0 7px 1px var(--stone-color);
+  box-shadow: 0 0 10px 2px var(--stone-color);
 }
 
 /* 100 %: goldener Abschluss */
@@ -1540,8 +1531,7 @@ body.panel-open #progress-widget {
   .pw-wave,
   .pw-title,
   .pw-more,
-  .pw-unit,
-  .pw-stones-label { display: none; }
+  .pw-unit { display: none; }
 
   .pw-pct { margin: 0; font-size: 14px; }
   .pw-pct small { font-size: 8.5px; }
@@ -1560,9 +1550,6 @@ body.panel-open #progress-widget {
     letter-spacing: 0;
   }
   .pw-ico { margin-right: 3px; font-size: 10px; }
-  .pw-stones { margin-top: 5px; padding-top: 4px; justify-content: flex-start; }
-  #progress-widget #stones-tracker { gap: 4px; }
-  #progress-widget #stones-tracker .stone-dot { width: 7px; height: 7px; }
 }
 
 /* Tablets hochkant: der zentrierte Titel reicht bis unter die Suche —
@@ -1585,7 +1572,6 @@ body.panel-open #progress-widget {
     row-gap: 5px;
   }
 
-  .pw-stones { margin-top: 4px; padding-top: 4px; }
 
   .pw-wave { display: flex; }
   .pw-title { display: block; padding-right: 0; font-size: 8px; line-height: 10px; letter-spacing: 1.6px; }
@@ -1620,8 +1606,6 @@ body.panel-open #progress-widget {
   }
 
   .pw-counts { margin-top: 4px; }
-  .pw-stones { margin-top: 4px; padding-top: 3px; }
-  #progress-widget #stones-tracker .stone-dot { width: 6px; height: 6px; }
 
   #progress-widget::before { border-top-left-radius: 12px; width: 10px; height: 10px; }
   #progress-widget::after { border-bottom-right-radius: 12px; width: 10px; height: 10px; }
@@ -1709,8 +1693,6 @@ body.panel-open #progress-widget {
   .pw-pct small { font-size: 8px; }
   .pw-bar-wrap { height: 5px; }
   .pw-counts { margin-top: 2px; line-height: 11px; }
-  .pw-stones { margin-top: 3px; padding-top: 3px; }
-  #progress-widget #stones-tracker .stone-dot { width: 6px; height: 6px; }
 
   #stats-overlay,
   #profile-dashboard { padding: 10px; }

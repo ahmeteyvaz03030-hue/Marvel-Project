@@ -141,7 +141,7 @@ body.watch-signed-out #panel-progress {
 }
 
 /* Noch nicht erschienen: deaktiviert, mit Datum */
-.watch-btn-seen:disabled {
+.watch-btn-seen.is-disabled {
   cursor: not-allowed;
   color: color-mix(in srgb, var(--watch-soon) 85%, #fff);
   background: rgba(255, 90, 60, 0.06);
@@ -152,8 +152,8 @@ body.watch-signed-out #panel-progress {
   letter-spacing: 0.6px;
 }
 
-.watch-btn-seen:disabled .wi-check { opacity: 0; }
-.watch-btn-seen:disabled .wi-ring { stroke-dasharray: 2.4 2.6; }
+.watch-btn-seen.is-disabled .wi-check { opacity: 0; }
+.watch-btn-seen.is-disabled .wi-ring { stroke-dasharray: 2.4 2.6; }
 
 /* Watchlist: JARVIS-Blau, Lesezeichen gefüllt */
 .watch-btn-list[aria-pressed="true"] {
@@ -758,4 +758,12 @@ body.watch-signed-out #panel-progress {
 @media (prefers-reduced-motion: reduce) {
   .pp-fill::after { display: none; }
   .watch-btn svg { animation: none !important; }
+}
+
+/* Karte passt nach einer Live-Änderung nicht mehr zum Status-Filter, wird aber
+   gerade bedient: abgedimmt stehen lassen, bis Zeiger/Fokus sie verlassen. */
+.film-card.is-leaving {
+  opacity: 0.45;
+  filter: saturate(0.55);
+  transition: opacity 0.25s ease, filter 0.25s ease;
 }

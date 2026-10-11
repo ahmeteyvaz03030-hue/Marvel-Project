@@ -198,13 +198,13 @@ window.MarvelProgress = (function () {
   let adapter = localAdapter;
 
   function emptyState() {
-    return { v: SCHEMA_VERSION, watched: {}, watchlist: {}, ratings: {}, visited: {}, achievements: {}, updatedAt: 0 };
+    return { v: SCHEMA_VERSION, watched: {}, watchlist: {}, ratings: {}, visited: {}, achievements: {}, completed: {}, updatedAt: 0 };
   }
 
   function sanitize(raw) {
     const s = emptyState();
     if (!raw || typeof raw !== "object") return s;
-    ["watched", "watchlist", "visited", "achievements"].forEach((k) => {
+    ["watched", "watchlist", "visited", "achievements", "completed"].forEach((k) => {
       const src = raw[k];
       if (src && typeof src === "object") {
         Object.keys(src).forEach((id) => {
@@ -277,14 +277,14 @@ window.MarvelProgress = (function () {
       const loaded = adapter.load(profile);
       state = sanitize(loaded);
       if (!loaded) migrateLegacy(profile, state);
-      // Bereits erfüllte, aber noch nicht gespeicherte Erfolge still nachtragen
-      // (z.B. nach der Übernahme alter Daten) — ohne Benachrichtigung.
+      // Bereits erfüllte, aber noch nicht gespeicherte Erfolge und Universums-
+      // Abschlüsse still nachtragen (z.B. nach der Übernahme alter Daten).
       evaluateAchievements(true);
+      checkUniverseCompletion(true);
       persist();
     } else {
       state = emptyState();
     }
-    lastCompleted = completedUniverseSet();
     emit({ type: "profile" });
   }
 
@@ -500,15 +500,18 @@ window.MarvelProgress = (function () {
     return unlocked;
   }
 
-  let lastCompleted = new Set();
-  function checkUniverseCompletion() {
-    const now = completedUniverseSet();
+  // Meldet ein Universum nur beim ERSTEN Abschluss pro Profil (gespeichert in
+  // state.completed) — wird es später unvollständig und wieder vollständig,
+  // gibt es keine erneute Meldung. Die Gold-Optik kommt weiterhin live aus
+  // universeStats().complete.
+  function checkUniverseCompletion(silent) {
     const newly = [];
-    now.forEach((id) => {
-      if (!lastCompleted.has(id)) newly.push(id);
+    completedUniverseSet().forEach((id) => {
+      if (state.completed[id]) return;
+      state.completed[id] = Date.now();
+      newly.push(id);
     });
-    lastCompleted = now;
-    if (newly.length) {
+    if (newly.length && !silent) {
       emit({
         type: "universe-complete",
         universes: newly.map((id) => {
@@ -598,7 +601,6 @@ window.MarvelProgress = (function () {
   window.addEventListener("storage", (e) => {
     if (!profile || e.key !== STORAGE_PREFIX + profile) return;
     state = sanitize(adapter.load(profile));
-    lastCompleted = completedUniverseSet();
     emit({ type: "sync" });
   });
 

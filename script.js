@@ -756,7 +756,11 @@
 
       node.querySelectorAll('[data-watch-action="seen"]').forEach((btn) => {
         const variant = btn.getAttribute("data-variant");
-        btn.disabled = !released;
+        // Bewusst kein disabled-Attribut: Klicks darauf würden vom Browser
+        // verschluckt — so erscheint beim Tippen der Hinweis zum Kinostart.
+        btn.classList.toggle("is-disabled", !released);
+        if (released) btn.removeAttribute("aria-disabled");
+        else btn.setAttribute("aria-disabled", "true");
         btn.setAttribute("aria-pressed", watched ? "true" : "false");
         btn.setAttribute("aria-label", `Gesehen: ${title}`);
         btn.title = !released
@@ -1330,6 +1334,40 @@
       });
     }
 
+    // Bei einer Live-Aktualisierung verschwindet eine Karte, die gerade bedient
+    // wird (Zeiger oder Fokus darauf), nicht unter dem Klick — sonst rückt die
+    // nächste Karte nach und ein Doppelklick träfe sie. Sie bleibt abgedimmt
+    // stehen, bis Zeiger und Fokus sie verlassen haben.
+    function setCardVisible(card, show, live, rerender) {
+      if (show || !live || card.classList.contains("hidden")) {
+        card.classList.remove("is-leaving");
+        card.classList.toggle("hidden", !show);
+        return;
+      }
+      const engaged = () => card.matches(":hover") || card.contains(document.activeElement);
+      if (!engaged()) {
+        card.classList.remove("is-leaving");
+        card.classList.add("hidden");
+        return;
+      }
+      if (card.classList.contains("is-leaving")) return;
+      card.classList.add("is-leaving");
+      const settle = () => {
+        if (!card.classList.contains("is-leaving")) return cleanup();
+        if (card.contains(document.activeElement)) return;
+        cleanup();
+        rerender();
+      };
+      // focusout feuert, bevor der Fokus weitergewandert ist
+      const onFocusOut = () => setTimeout(settle, 0);
+      function cleanup() {
+        card.removeEventListener("pointerleave", settle);
+        card.removeEventListener("focusout", onFocusOut);
+      }
+      card.addEventListener("pointerleave", settle);
+      card.addEventListener("focusout", onFocusOut);
+    }
+
     // Status-Zeile: die Anzahl je Chip bezieht sich auf die übrigen aktiven
     // Filter (Universum, Phase, Suche) — also genau das, was ein Klick zeigt.
     function renderMovieStatusFilters() {
@@ -1363,7 +1401,7 @@
           if (card) grid.appendChild(card);
         });
       }
-      movieCards.forEach((card, key) => card.classList.toggle("hidden", !visible.has(key)));
+      movieCards.forEach((card, key) => setCardVisible(card, visible.has(key), keepOrder === true, () => renderMovies(true)));
       empty.classList.toggle("hidden", list.length > 0);
       count.textContent = `${list.length} Film${list.length === 1 ? "" : "e"}`;
       renderMovieStatusFilters();
@@ -1438,8 +1476,8 @@
     }
 
     // Status-Filter und eigene kleine Anzahl für die Serien (gleiche Karten,
-    // nur ein-/ausgeblendet).
-    function renderSeries() {
+    // nur ein-/ausgeblendet). live: Aufruf durch eine Fortschrittsänderung.
+    function renderSeries(live) {
       buildSeriesGrid();
       const row = document.getElementById("discover-series-filter-status");
       Watch.renderStatusChips(row, seriesState.status, Watch.statusCounts(seriesWatchIds), (status) => {
@@ -1450,7 +1488,7 @@
       let visible = 0;
       seriesCards.forEach((card, idx) => {
         const show = Watch.matchesStatus(seriesWatchIds[idx], seriesState.status);
-        card.classList.toggle("hidden", !show);
+        setCardVisible(card, show, live === true, () => renderSeries(true));
         if (show) visible++;
       });
       let countEl = row.querySelector(".watch-filter-count");
@@ -1477,8 +1515,13 @@
     if (Watch.P) {
       Watch.P.subscribe((ev) => {
         if (!Watch.isRelevant(ev)) return;
-        if (moviesBuilt) renderMovies(true);
-        if (seriesBuilt) renderSeries();
+        // Ein neues Profil startet ohne den Status-Filter des vorherigen.
+        if (ev.type === "profile") {
+          movieState.status = "all";
+          seriesState.status = "all";
+        }
+        if (moviesBuilt) renderMovies(ev.type !== "profile");
+        if (seriesBuilt) renderSeries(ev.type !== "profile");
       });
     }
 

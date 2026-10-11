@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
 // Fortschritts-Oberfläche (HUD)
 //
-// - Multiverse-Progress-Widget oben rechts (#progress-widget), darin weiterhin
-//   die Infinity-Steine-Zeile (#stones-tracker, gefüllt von script.js).
+// - Multiverse-Progress-Widget oben rechts (#progress-widget); es ersetzt die
+//   frühere Infinity-Steine-Anzeige. Die Steine (#stones-tracker, gefüllt von
+//   script.js) leben als Easter-Egg-Abschnitt in der Statistik weiter.
 // - Ausführliche Statistik (#stats-overlay) und persönliches Profil-Dashboard
 //   (#profile-dashboard) als Vollbild-Overlays.
 // - J.A.R.V.I.S.-Benachrichtigungen im vorhandenen #toast-layer.
@@ -315,7 +316,6 @@ window.MarvelProgressUI = (function () {
 
   function buildWidget() {
     if (!widget) return;
-    const stones = document.getElementById("stones-tracker");
     widget.setAttribute("role", "button");
     widget.setAttribute("tabindex", "0");
     widget.setAttribute("aria-haspopup", "dialog");
@@ -342,24 +342,14 @@ window.MarvelProgressUI = (function () {
       '<span class="pw-count"><span class="pw-ico">📺</span><b class="pw-series">0 / 0</b><span class="pw-unit">&nbsp;Serien</span></span>' +
       "</span>";
 
-    // Die Steine-Zeile gehört zum Sammel-Easter-Egg und öffnet keine Statistik
-    const stonesRow = document.createElement("div");
-    stonesRow.className = "pw-stones";
-    stonesRow.innerHTML = '<span class="pw-stones-label">INFINITY-STEINE</span>';
-    if (stones) stonesRow.appendChild(stones);
-
     widget.insertBefore(main, widget.firstChild);
     widget.insertBefore(flash, main);
-    widget.appendChild(stonesRow);
 
     W.pct = main.querySelector(".pw-pct-num");
     W.movies = main.querySelector(".pw-movies");
     W.series = main.querySelector(".pw-series");
 
-    // Klicks aus der Steine-Zeile erreichen weiterhin die Stein-Punkte
-    // (deren eigene Handler in script.js), lösen hier aber nichts aus.
-    widget.addEventListener("click", (e) => {
-      if (e.target.closest && e.target.closest(".pw-stones")) return;
+    widget.addEventListener("click", () => {
       playClick();
       openStats(widget);
     });
@@ -459,7 +449,16 @@ window.MarvelProgressUI = (function () {
       '<h2 id="ps-title" class="mp-title">Multiverse Progress</h2>' +
       '<p class="travel-sub mp-sub" data-slot="sub"></p>' +
       '<div data-slot="body"></div>' +
+      // Fester Abschnitt (wird beim Aktualisieren nicht neu aufgebaut): die
+      // Infinity-Steine des Sammel-Easter-Eggs, früher oben rechts auf der Startseite.
+      '<section class="mp-section ps-stones-section">' +
+      '<div class="mp-section-head"><h3>Infinity-Steine</h3><span>Easter Egg · versteckt in der 3D-Szene</span></div>' +
+      '<div class="ps-stones" data-slot="stones"></div>' +
+      "</section>" +
       "</div>";
+    const stones = document.getElementById("stones-tracker");
+    const stonesSlot = statsEl.querySelector('[data-slot="stones"]');
+    if (stones && stonesSlot) stonesSlot.appendChild(stones);
 
     statsEl.addEventListener("click", (e) => {
       if (e.target === statsEl) {
