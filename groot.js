@@ -1,10 +1,15 @@
 // ---------------------------------------------------------------------------
 // Groot — wachsender Begleiter auf einer JARVIS-Plattform (eigenständige Komponente)
 //
-// - Stilisierter, prozeduraler 3D-Platzhalter (kein offizielles Marvel-Modell,
-//   keine externen Assets): ein Rig aus Gruppen/Segmenten, dessen Proportionen
-//   zwischen fünf Entwicklungsstufen per Position/Skalierung überblendet werden.
-//   Die Geometrie wird genau einmal gebaut, nie pro Frame.
+// - Die Komponente (Stufen, Wachstums- und Animations-Timing, HUD, Sprechblase,
+//   Trefferfläche, Kamera, Plattform, Partikel, Pausen, API) spricht mit der
+//   Figur nur über ein austauschbares 3D-Modell — Schnittstelle unten bei
+//   „3D-Modell“, Anleitung für ein lizenziertes GLB in GROOT-MODELL.md.
+// - Standardmodell „procedural“ (ganz unten): stilisierter, prozeduraler
+//   Platzhalter (kein offizielles Marvel-Modell, keine externen Assets): ein
+//   Rig aus Gruppen/Segmenten, dessen Proportionen zwischen fünf
+//   Entwicklungsstufen per Position/Skalierung überblendet werden. Die
+//   Geometrie wird genau einmal gebaut, nie pro Frame.
 // - Das Wachstum folgt allein MarvelProgress.stats().all.percent (derselbe
 //   gerundete Wert wie im Fortschritts-Widget); eigener Zustand nur für die
 //   Animationen.
@@ -60,6 +65,47 @@
     return s.index + s.within * (s.index === STAGES.length - 1 ? 1 : 0.5);
   }
 
+  // ---------- 3D-Modell: Schnittstelle und Registrierung ----------
+  // Die Figur ist austauschbar. Ein Modell entsteht über eine Fabrik
+  //   factory(ctx) → model   oder   Promise<model>
+  //   ctx = { THREE, scene, renderer, config, stages, growthMax, reduceMotion() }
+  //   (config = window.MARVEL_GROOT_CONFIG; scene nur lesen — alles, was zur
+  //   Figur gehört, hängt unter model.object)
+  // Pflicht:
+  //   object         THREE.Object3D; Fußpunkt bei y = 0 (Plattformoberfläche),
+  //                  Blick nach +z. Die Komponente bewegt es nicht — Drehung
+  //                  und Haltung kommen über pose().
+  //   setGrowth(g)   Wachstum g = 0 … growthMax (0 = Baby bei 0 %, 1 = 20 %,
+  //                  2 = 40 %, 3 = 60 %, 4 = Erwachsen bei 80 %, 5 = voll
+  //                  ausgewachsen bei 100 %; Zwischenwerte überblenden).
+  //   height()       Körperhöhe laut Proportionen (ohne Idle-Bewegung)
+  //   pose(s, dt)    Idle-/Winke-Pose, jeden Frame; s = poseState (s.u.)
+  // Optional (sonst einfache Rückfälle, siehe checkModel):
+  //   headTop(v)     Weltposition knapp über dem Kopf → v (Sprechblase)
+  //   head()         { y, size }: Kopfmitte über dem Fußpunkt, Kopfhöhe
+  //                  (runder Kompaktausschnitt auf Smartphones)
+  //   bounds(box)    Welt-Hüllquader der Figur → box (Trefferfläche)
+  //   setGlow(v)     grünes Wachstums-Leuchten 0..1
+  //   emitters()     { radius, y0, y1 }: Startbereich der Blätter-Partikel
+  //   triangles()    Dreiecke der Figur (debugInfo)
+  //   credit         Hinweis- bzw. Lizenztext für das Groot-HUD
+  //   dispose()      GPU-Ressourcen freigeben
+  // Nach setGrowth() und pose() muss das Modell renderbereit sein (gerendert
+  // wird teils ohne weiteren Aufruf, z.B. nach debugSetPercent).
+  // Auswahl: window.MARVEL_GROOT_CONFIG = { model: "<name>" } vor dem Start
+  // oder MarvelGroot.useModel(name). Bis ein anderes Modell bereitsteht oder
+  // wenn es fehlschlägt, zeigt Groot den prozeduralen Platzhalter.
+  const factories = Object.create(null);
+  factories.procedural = createProceduralModel;
+  let requestedModel = null;
+  let onModelWish = null; // ab dem Start: gewünschtes Modell anfordern
+
+  function wantedModel() {
+    if (requestedModel) return requestedModel;
+    const cfg = window.MARVEL_GROOT_CONFIG;
+    return cfg && typeof cfg.model === "string" && cfg.model ? cfg.model : "procedural";
+  }
+
   // Bis zum Start (erst mit aktivem Profil) nehmen Platzhalter die Aufrufe an.
   let earlyPaused = false;
   const api = {
@@ -76,6 +122,20 @@
       if (started && api.debugSetPercent !== stubDebug) api.debugSetPercent(p);
     },
     debugInfo: () => null,
+    registerModel(name, factory) {
+      if (!name || typeof name !== "string" || name === "procedural" || typeof factory !== "function") {
+        if (window.console) console.warn("Groot: registerModel(name, factory) erwartet einen Namen (nicht „procedural“) und eine Fabrikfunktion.");
+        return false;
+      }
+      factories[name] = factory;
+      // Spät registriert (z.B. nachgeladenes Skript): jetzt laden, falls gewünscht
+      if (onModelWish && wantedModel() === name) onModelWish(name);
+      return true;
+    },
+    useModel(name) {
+      requestedModel = typeof name === "string" && name ? name : null;
+      if (onModelWish) onModelWish(wantedModel());
+    },
   };
   const stubRefresh = api.refresh;
   const stubDebug = api.debugSetPercent;
@@ -83,6 +143,8 @@
 
   const widget = document.getElementById("groot-widget");
   if (!widget || !window.THREE || !window.MarvelProgress) return;
+
+  const THREE = window.THREE;
 
   let started = false;
   let scheduled = false;
@@ -115,7 +177,6 @@
 
   function start() {
     unsubscribeBoot();
-    const THREE = window.THREE;
     const MP = window.MarvelProgress;
     const HUD = window.MarvelHUD || null;
 
@@ -142,35 +203,1243 @@
     else if (reduceMQ.addListener) reduceMQ.addListener(onReduceChange);
 
     // ---------- Hilfen ----------
-    function makeRng(seed) {
-      let s = seed >>> 0 || 1;
-      return function () {
-        s ^= s << 13;
-        s >>>= 0;
-        s ^= s >>> 17;
-        s ^= s << 5;
-        s >>>= 0;
-        return s / 4294967296;
+    // Weicher Lichtpunkt auf Schwarz (für additive Funken).
+    function sparkTexture() {
+      const c = document.createElement("canvas");
+      c.width = c.height = 32;
+      const x = c.getContext("2d");
+      const g = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.25, "#9a9a9a");
+      g.addColorStop(1, "#000000");
+      x.fillStyle = g;
+      x.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(c);
+    }
+
+    function blobTexture() {
+      const c = document.createElement("canvas");
+      c.width = c.height = 64;
+      const x = c.getContext("2d");
+      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, "rgba(0,0,0,0.85)");
+      g.addColorStop(0.55, "rgba(0,0,0,0.45)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = g;
+      x.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    }
+
+    // Additives Leuchten, das den Alphakanal des Canvas nicht verändert: die
+    // Plattform „strahlt“ dadurch auf die Seite dahinter, statt sie abzudunkeln.
+    function glowBlend(mat) {
+      mat.transparent = true;
+      mat.depthWrite = false;
+      mat.blending = THREE.CustomBlending;
+      mat.blendEquation = THREE.AddEquation;
+      mat.blendSrc = THREE.OneFactor;
+      mat.blendDst = THREE.OneFactor;
+      mat.blendSrcAlpha = THREE.ZeroFactor;
+      mat.blendDstAlpha = THREE.OneFactor;
+      return mat;
+    }
+
+    // ---------- Lichter ----------
+    scene.add(new THREE.HemisphereLight(0x9cc4ff, 0x1c1008, 0.42));
+    const key = add(scene, new THREE.DirectionalLight(0xffe2c4, 1.7));
+    key.position.set(3.6, 4.2, 3.4);
+    const fill = add(scene, new THREE.DirectionalLight(0x86aaff, 0.38));
+    fill.position.set(-4.5, 1.0, 3);
+    const rimBlue = add(scene, new THREE.DirectionalLight(0x5abeff, 0.75));
+    rimBlue.position.set(-3.5, 2.4, -4);
+    const rimGreen = add(scene, new THREE.DirectionalLight(0x7dff9a, 0.45));
+    rimGreen.position.set(3.8, 2.0, -3.6);
+    const platLight = add(scene, new THREE.PointLight(0x46d8ff, 0.7, 2.6, 2));
+    platLight.position.set(0, 0.35, 0.6);
+
+    // =====================================================================
+    // Figur: austauschbares 3D-Modell (Schnittstelle oben)
+    // =====================================================================
+    let model = null;
+    let modelName = "";
+    let modelPending = null; // Name eines noch ladenden Modells
+    let modelError = null;
+    let modelToken = 0;
+    const _mbox = new THREE.Box3();
+
+    function modelContext() {
+      return {
+        THREE,
+        scene,
+        renderer,
+        config: window.MARVEL_GROOT_CONFIG || {},
+        stages: STAGES.map((s) => Object.assign({}, s)),
+        growthMax: STAGES.length,
+        reduceMotion: () => reduce,
       };
     }
 
-    function add(parent, obj) {
-      parent.add(obj);
-      return obj;
-    }
-
-    function mesh(geo, mat, parent) {
-      const m = new THREE.Mesh(geo, mat);
-      if (parent) parent.add(m);
+    // Prüft die Pflichtteile und ergänzt fehlende optionale Methoden.
+    function checkModel(m, name) {
+      if (!m || !m.object || !m.object.isObject3D || typeof m.setGrowth !== "function" || typeof m.height !== "function" || typeof m.pose !== "function") {
+        throw new Error("Modell „" + name + "“ erfüllt die Schnittstelle nicht (object, setGrowth, height, pose)");
+      }
+      if (typeof m.bounds !== "function") m.bounds = (box) => box.setFromObject(m.object);
+      if (typeof m.head !== "function") {
+        m.head = () => {
+          const h = m.height();
+          return { y: h * 0.85, size: h * 0.25 };
+        };
+      }
+      if (typeof m.headTop !== "function") {
+        m.headTop = (v) => {
+          m.bounds(_mbox);
+          return v.set((_mbox.min.x + _mbox.max.x) / 2, _mbox.max.y, (_mbox.min.z + _mbox.max.z) / 2);
+        };
+      }
+      if (typeof m.emitters !== "function") {
+        m.emitters = () => {
+          const h = m.height();
+          return { radius: h * 0.2, y0: h * 0.25, y1: h * 1.05 };
+        };
+      }
+      if (typeof m.setGlow !== "function") m.setGlow = () => {};
+      if (typeof m.dispose !== "function") m.dispose = () => {};
       return m;
     }
 
-    function group(parent) {
-      const g = new THREE.Group();
-      if (parent) parent.add(g);
-      return g;
+    function discardModel(m) {
+      try {
+        if (m && typeof m.dispose === "function") m.dispose();
+      } catch (e) {
+        /* ignorieren */
+      }
     }
 
+    // Setzt ein geprüftes Modell ein. Beim Tausch übernimmt das neue Modell
+    // zuerst Wachstum, Leuchten und Pose — wirft es dabei, bleibt das alte.
+    function installModel(next, name) {
+      const prev = model;
+      if (prev) {
+        next.setGrowth(anim.g);
+        next.setGlow(glowValue);
+        if (posed) next.pose(poseState, 0);
+      }
+      model = next;
+      modelName = name;
+      if (prev) scene.remove(prev.object);
+      scene.add(next.object);
+      if (!prev) return;
+      discardModel(prev);
+      applyCredit();
+      hitDirty = true;
+      if (compact) placeCamera();
+      renderer.compile(scene, camera);
+      if (shown && !running) renderOnce();
+    }
+
+    function useProcedural() {
+      if (modelName === "procedural") return;
+      installModel(checkModel(createProceduralModel(modelContext()), "procedural"), "procedural");
+    }
+
+    function modelFailed(name, err) {
+      modelError = name + ": " + ((err && err.message) || String(err));
+      if (window.console) console.warn("Groot: Modell „" + name + "“ nicht verfügbar – der prozedurale Platzhalter bleibt.", err);
+      useProcedural();
+    }
+
+    // Fordert ein registriertes Modell an: ein synchron geliefertes sofort,
+    // ein Promise nach dem Laden. Eine neuere Anfrage verwirft ältere.
+    function requestModel(name) {
+      const token = ++modelToken;
+      modelPending = null;
+      if (name === modelName) return;
+      const factory = factories[name];
+      if (!factory) {
+        modelFailed(name, new Error("nicht registriert"));
+        return;
+      }
+      const accept = (m) => {
+        try {
+          installModel(checkModel(m, name), name);
+          modelError = null;
+        } catch (err) {
+          discardModel(m);
+          modelFailed(name, err);
+        }
+      };
+      let out;
+      try {
+        out = factory(modelContext());
+      } catch (err) {
+        modelFailed(name, err);
+        return;
+      }
+      if (out && typeof out.then === "function") {
+        modelPending = name;
+        out.then(
+          (m) => {
+            if (token !== modelToken) {
+              discardModel(m);
+              return;
+            }
+            modelPending = null;
+            accept(m);
+          },
+          (err) => {
+            if (token !== modelToken) return;
+            modelPending = null;
+            modelFailed(name, err);
+          }
+        );
+        return;
+      }
+      accept(out);
+    }
+
+    requestModel(wantedModel());
+    // Lädt das gewünschte Modell noch (oder fehlt es), steht der Platzhalter da
+    if (!model) useProcedural();
+
+    // =====================================================================
+    // JARVIS-Plattform
+    // =====================================================================
+    const PLAT_R = 0.78;
+    const platform = group(scene);
+    const platUniforms = {
+      uTime: { value: 0 },
+      uProgress: { value: 0 },
+      uPulse: { value: 0 },
+      uHover: { value: 0 },
+    };
+    const base = mesh(
+      new THREE.CylinderGeometry(PLAT_R * 0.98, PLAT_R * 0.84, 0.1, 48, 1, false),
+      new THREE.MeshStandardMaterial({ color: 0x070c16, metalness: 0.75, roughness: 0.34, emissive: 0x01050b }),
+      platform
+    );
+    base.position.y = -0.052;
+    const shadow = mesh(
+      new THREE.CircleGeometry(0.62, 32),
+      new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false, toneMapped: false }),
+      platform
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.003;
+    shadow.renderOrder = 1;
+
+    const DISC_R = PLAT_R * 1.25;
+    const disc = mesh(
+      new THREE.CircleGeometry(DISC_R, 72),
+      glowBlend(
+        new THREE.ShaderMaterial({
+          uniforms: platUniforms,
+          // fwidth braucht unter WebGL1 die Ableitungs-Erweiterung
+          extensions: { derivatives: true },
+          vertexShader: `
+            varying vec2 vPos;
+            void main() {
+              vPos = position.xy / ${DISC_R.toFixed(4)};
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }`,
+          fragmentShader: `
+            uniform float uTime;
+            uniform float uProgress;
+            uniform float uPulse;
+            uniform float uHover;
+            varying vec2 vPos;
+            float ring(float r, float c, float w) { return 1.0 - smoothstep(0.0, w, abs(r - c)); }
+            void main() {
+              float r = length(vPos);
+              if (r > 1.0) discard;
+              float a = atan(vPos.y, vPos.x);
+              float a01 = fract((a + 1.5707963) / 6.2831853);
+              vec3 cyan = vec3(0.26, 0.72, 1.0);
+              vec3 green = vec3(0.36, 1.0, 0.55);
+              vec3 gold = vec3(1.0, 0.78, 0.3);
+              float fw = fwidth(r) * 1.2;
+              vec3 col = cyan * smoothstep(0.8, 0.0, r) * 0.03;
+              col += cyan * ring(r, 0.2, fw + 0.006) * 0.26;
+              col += cyan * ring(r, 0.47, fw + 0.004) * 0.2 * step(0.45, fract(a01 * 40.0 + uTime * 0.05));
+              float seg = step(0.0, sin((a01 * 3.0 - uTime * 0.06) * 6.2831853) + 0.4);
+              col += cyan * ring(r, 0.62, fw + 0.01) * 0.3 * seg;
+              float track = ring(r, 0.76, fw + 0.014);
+              float filled = step(a01, uProgress);
+              col += mix(cyan * 0.08, mix(green, gold, a01) * 0.95, filled) * track;
+              float mk = 0.0;
+              for (int i = 1; i < 5; i++) mk += 1.0 - smoothstep(0.0, 0.006, abs(a01 - float(i) * 0.2));
+              col += gold * mk * ring(r, 0.76, 0.045) * 0.6;
+              float tick = step(0.8, fract(a01 * 72.0)) * ring(r, 0.86, 0.02);
+              col += cyan * tick * 0.22;
+              col += cyan * ring(r, 0.97, fw + 0.02) * 0.18;
+              float sweep = pow(max(0.0, cos(a - uTime * 0.7)), 24.0) * smoothstep(0.8, 0.15, r);
+              col += cyan * sweep * 0.1;
+              col *= 0.8 + 0.2 * sin(vPos.y * 90.0 - uTime * 3.0);
+              float wave = ring(r, 0.18 + fract(uTime * 0.7) * 0.75, 0.06);
+              col += green * uPulse * (wave * 0.6 + smoothstep(0.8, 0.0, r) * 0.22);
+              col *= 1.0 + uHover * 0.6;
+              gl_FragColor = vec4(col, 1.0);
+            }`,
+        })
+      ),
+      platform
+    );
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.004;
+    disc.renderOrder = 2;
+
+    const rimMat = glowBlend(new THREE.MeshBasicMaterial({ color: 0x2a86d6, toneMapped: false }));
+    const rimRing = mesh(new THREE.TorusGeometry(PLAT_R * 0.98, 0.011, 4, 72), rimMat, platform);
+    rimRing.rotation.x = Math.PI / 2;
+    rimRing.renderOrder = 3;
+    const lowRing = mesh(new THREE.TorusGeometry(PLAT_R * 0.85, 0.008, 4, 64), rimMat, platform);
+    lowRing.rotation.x = Math.PI / 2;
+    lowRing.position.y = -0.1;
+    lowRing.renderOrder = 3;
+
+    const beamUniforms = { uTime: platUniforms.uTime, uPulse: platUniforms.uPulse };
+    const beam = mesh(
+      new THREE.CylinderGeometry(PLAT_R * 0.9, PLAT_R * 0.96, 0.5, 48, 1, true).translate(0, 0.25, 0),
+      glowBlend(
+        new THREE.ShaderMaterial({
+          uniforms: beamUniforms,
+          side: THREE.DoubleSide,
+          vertexShader: `
+            varying vec2 vUv;
+            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+          fragmentShader: `
+            uniform float uTime;
+            uniform float uPulse;
+            varying vec2 vUv;
+            void main() {
+              float f = pow(1.0 - vUv.y, 2.6);
+              float lines = 0.7 + 0.3 * sin(vUv.y * 70.0 - uTime * 4.0);
+              vec3 c = mix(vec3(0.2, 0.62, 1.0), vec3(0.35, 1.0, 0.55), uPulse);
+              gl_FragColor = vec4(c * f * lines * (0.035 + uPulse * 0.16), 1.0);
+            }`,
+        })
+      ),
+      platform
+    );
+    beam.renderOrder = 4;
+
+    // =====================================================================
+    // Wachstums-Effekte: fliegende Blätter + Funken
+    // =====================================================================
+    // Eigene Uniforms (gleiche Werte wie die Figur), damit die Effekte nicht
+    // vom eingesetzten Modell abhängen
+    const fxUniforms = {
+      uTime: { value: 0 },
+      uGlow: { value: 0 },
+      uGlowColor: { value: new THREE.Color(0x3cff6a) },
+      uFlutter: { value: 1 },
+    };
+    const P_COUNT = 22;
+    const particleMesh = new THREE.InstancedMesh(leafGeometry(), leafMaterial(leafTexture(), fxUniforms, 0.4), P_COUNT);
+    particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    particleMesh.frustumCulled = false;
+    particleMesh.visible = false;
+    scene.add(particleMesh);
+    const particles = [];
+    for (let i = 0; i < P_COUNT; i++) {
+      particles.push({ age: 1, life: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), axis: new THREE.Vector3(0, 0, 1), rot: 0, spin: 0, size: 0.1 });
+    }
+
+    const S_COUNT = 40;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPos = new Float32Array(S_COUNT * 3);
+    sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+    const sparkMat = glowBlend(
+      new THREE.PointsMaterial({ size: 0.07, map: sparkTexture(), color: 0x000000, sizeAttenuation: true, toneMapped: false })
+    );
+    const sparks = new THREE.Points(sparkGeo, sparkMat);
+    sparks.frustumCulled = false;
+    sparks.visible = false;
+    scene.add(sparks);
+    const sparkData = [];
+    for (let i = 0; i < S_COUNT; i++) sparkData.push({ a: 0, r: 0, y: 0, v: 0, delay: 0 });
+
+    // =====================================================================
+    // DOM: Trefferfläche, Sprechblase, HUD
+    // =====================================================================
+    const hit = document.createElement("button");
+    hit.type = "button";
+    hit.className = "groot-hit";
+    hit.setAttribute("aria-label", "Groot – Entwicklungsstufe anzeigen");
+    hit.setAttribute("aria-expanded", "false");
+    hit.setAttribute("aria-controls", "groot-hud");
+
+    const bubble = document.createElement("div");
+    bubble.className = "groot-bubble";
+    bubble.setAttribute("aria-hidden", "true");
+    bubble.textContent = "I am Groot.";
+
+    const hud = document.createElement("div");
+    hud.id = "groot-hud";
+    hud.className = "groot-hud";
+    hud.setAttribute("role", "dialog");
+    hud.setAttribute("aria-label", "Groot – Entwicklungsstand");
+    hud.hidden = true;
+    hud.innerHTML = `
+      <div class="groot-hud-top">
+        <span class="panel-eyebrow">BEGLEITER</span>
+        <button type="button" class="groot-hud-close" aria-label="Schließen">✕</button>
+      </div>
+      <h3 class="groot-hud-title">GROOT</h3>
+      <div class="groot-hud-stage"><span data-g="stage"></span><small data-g="step"></small></div>
+      <div class="groot-hud-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="groot-hud-row"><span>Fortschritt</span><strong data-g="percent"></strong></div>
+      <div class="groot-hud-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Fortschritt">
+        <i data-g="fill"></i><b style="left:20%"></b><b style="left:40%"></b><b style="left:60%"></b><b style="left:80%"></b>
+      </div>
+      <div class="groot-hud-count" data-g="count"></div>
+      <div class="groot-hud-next" data-g="next"></div>
+      <p class="groot-hud-note">Stilisierter 3D-Platzhalter – kein offizielles Marvel-Modell</p>`;
+    const hudRef = {};
+    hud.querySelectorAll("[data-g]").forEach((el) => (hudRef[el.dataset.g] = el));
+    const hudPips = hud.querySelectorAll(".groot-hud-pips i");
+    const hudBar = hud.querySelector(".groot-hud-bar");
+    const hudNote = hud.querySelector(".groot-hud-note");
+    // Hinweis- bzw. Lizenztext des Modells (Platzhalter: „Stilisierter …“)
+    function applyCredit() {
+      hudNote.textContent = model.credit || "";
+      hudNote.hidden = !model.credit;
+    }
+    applyCredit();
+
+    widget.textContent = "";
+    widget.append(canvas, hit, bubble, hud);
+    widget.classList.remove("hidden");
+    widget.setAttribute("aria-hidden", "true");
+
+    // =====================================================================
+    // Zustand
+    // =====================================================================
+    let debugPercent = null;
+    let paused = earlyPaused;
+    let shown = false;
+    let running = false;
+    let rafId = 0;
+    let lastFrame = 0;
+    let clock = 0;
+    let compact = false;
+    let compactSide = 1;
+    let viewW = 1;
+    let viewH = 1;
+
+    const anim = { g: 0, from: 0, to: 0, t: 0, dur: 1, delay: 0, active: false, celebrate: false };
+    const glow = { t: -100, dur: 2.6 };
+    const blink = { next: 2.5, t: -1, second: false };
+    const look = { yaw: 0, pitch: 0, roll: 0, tYaw: 0, tPitch: 0, tRoll: 0, next: 1.5 };
+    const wave = { t: -1, dur: 2.6, next: 14 + Math.random() * 12 };
+    const bubbleState = { next: 40 + Math.random() * 50, hideAt: 0 };
+    let hover = 0;
+    let hoverTarget = 0;
+    let hitDirty = true;
+    let glowValue = 0;
+    let posed = false;
+
+    // Pose für model.pose(): neutral, ohne Bezug zu einem bestimmten Rig
+    const poseState = {
+      time: 0, // Uhr in Sekunden (Pendeln, Blätterflattern)
+      reduceMotion: false,
+      compact: false, // runder Kompaktausschnitt (Smartphone)
+      bodyYaw: 0, // Drehung des ganzen Körpers um die Hochachse (rad)
+      breath: 0, // Atem-Auslenkung, vorzeichenbehaftet (±0,011; reduziert ±0,0025)
+      yaw: 0, // Blick (rad)
+      pitch: 0,
+      roll: 0,
+      blink: 0, // 0 = Augen offen … 1 = geschlossen
+      wave: 0, // Winken 0..1 (weich ein- und ausgeblendet)
+      waveSide: -1, // winkender Arm: -1 = links im Bild (x < 0), 1 = rechts
+      waveTime: -1, // Sekunden seit Beginn des Winkens (Hin und Her)
+    };
+
+    function currentPercent() {
+      if (debugPercent != null) return debugPercent;
+      if (!MP.profile()) return 0;
+      return MP.stats().all.percent;
+    }
+
+    function setGrowth(g) {
+      anim.g = g;
+      model.setGrowth(g);
+      hitDirty = true;
+      if (compact) placeCamera();
+    }
+
+    // ---------- Kamera ----------
+    const CAM_FOV = 24;
+    function placeCamera() {
+      const tanH = Math.tan((CAM_FOV * Math.PI) / 360);
+      if (!compact) {
+        // Fester Ausschnitt (erwachsener Groot + Plattform), damit das Wachstum sichtbar bleibt
+        const lookY = 1.04;
+        let dist = 6.0;
+        const needW = PLAT_R * 2.3;
+        if (camera.aspect * 2 * dist * tanH < needW) dist = needW / (camera.aspect * 2 * tanH);
+        camera.position.set(0, lookY + dist * 0.095, dist);
+        camera.lookAt(0, lookY, 0);
+      } else {
+        // Kompakt (Smartphone): Kopf/Oberkörper im runden Ausschnitt
+        const head = model.head();
+        const frame = Math.max(head.size * 2.3, 0.66);
+        const lookY = head.y - frame * 0.05;
+        const dist = frame / (2 * tanH) / Math.min(1, camera.aspect);
+        camera.position.set(0, lookY + dist * 0.08, dist);
+        camera.lookAt(0, lookY, 0);
+      }
+      camera.updateProjectionMatrix();
+    }
+
+    function resize() {
+      const w = Math.max(1, widget.clientWidth);
+      const h = Math.max(1, widget.clientHeight);
+      viewW = w;
+      viewH = h;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      const compactNow = compactMQ.matches;
+      if (compactNow !== compact) {
+        compact = compactNow;
+        platform.visible = !compact;
+        widget.classList.toggle("groot-compact", compact);
+      }
+      const rect = widget.getBoundingClientRect();
+      compactSide = rect.left + rect.width / 2 < window.innerWidth / 2 ? 1 : -1;
+      placeCamera();
+      hitDirty = true;
+      if (shown && !running) renderOnce();
+    }
+
+    const compactMQ = window.matchMedia("(max-width: 640px), (max-height: 480px) and (orientation: landscape)");
+
+    // ---------- Trefferfläche & Sprechblase ----------
+    const _v = new THREE.Vector3();
+    const _box = new THREE.Box3();
+    const _corner = new THREE.Vector3();
+    function projectToPx(v) {
+      _v.copy(v).project(camera);
+      return { x: (_v.x * 0.5 + 0.5) * viewW, y: (-_v.y * 0.5 + 0.5) * viewH };
+    }
+
+    function updateHitArea() {
+      hitDirty = false;
+      if (compact) {
+        hit.style.left = hit.style.top = "0px";
+        hit.style.width = viewW + "px";
+        hit.style.height = viewH + "px";
+        hit.style.clipPath = "";
+        return;
+      }
+      model.bounds(_box);
+      _box.expandByPoint(_corner.set(-PLAT_R, -0.1, PLAT_R));
+      _box.expandByPoint(_corner.set(PLAT_R, -0.1, -PLAT_R));
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        _corner.set(i & 1 ? _box.max.x : _box.min.x, i & 2 ? _box.max.y : _box.min.y, i & 4 ? _box.max.z : _box.min.z);
+        const p = projectToPx(_corner);
+        x0 = Math.min(x0, p.x);
+        y0 = Math.min(y0, p.y);
+        x1 = Math.max(x1, p.x);
+        y1 = Math.max(y1, p.y);
+      }
+      x0 = clamp(x0, 0, viewW);
+      x1 = clamp(x1, 0, viewW);
+      y0 = clamp(y0 - 4, 0, viewH);
+      y1 = clamp(y1, 0, viewH);
+      hit.style.left = x0.toFixed(0) + "px";
+      hit.style.top = y0.toFixed(0) + "px";
+      hit.style.width = (x1 - x0).toFixed(0) + "px";
+      hit.style.height = (y1 - y0).toFixed(0) + "px";
+
+      // Klickbar ist nur die Figur (mittlere Säule) und die flache Plattform —
+      // der transparente Raum neben Kopf, Ästen und Armen lässt Klicks zur
+      // 3D-Szene (Planeten, Drehen) durch. clip-path begrenzt auch das Hit-Testing.
+      const c = projectToPx(_corner.set(0, 0.05, 0));
+      const rx = Math.abs(projectToPx(_corner.set(PLAT_R * 0.98, 0.05, 0)).x - c.x);
+      const ry = Math.max(4, Math.abs(projectToPx(_corner.set(0, 0.05, PLAT_R * 0.98)).y - c.y));
+      // Mitte etwas tiefer und großzügiger, damit auch die Vorderkante der
+      // (dicken) Plattform klickbar ist
+      const cx = c.x - x0;
+      const cy = c.y - y0 + ry * 0.25;
+      const rxs = rx * 1.04;
+      const rys = ry * 1.35 + 4;
+      const half = Math.min(rxs * 0.92, Math.max(14, (x1 - x0) * 0.24));
+      const colL = cx - half;
+      const colR = cx + half;
+      const tR = Math.acos(clamp((colR - cx) / rxs, -1, 1));
+      const tL = Math.acos(clamp((colL - cx) / rxs, -1, 1));
+      const pts = [colL + "px 0px", colR + "px 0px"];
+      const steps = 14;
+      const span = tR + (2 * Math.PI - tL);
+      for (let i = 0; i <= steps; i++) {
+        const t = tR - (span * i) / steps;
+        pts.push((cx + rxs * Math.cos(t)).toFixed(1) + "px " + (cy - rys * Math.sin(t)).toFixed(1) + "px");
+      }
+      hit.style.clipPath = "polygon(" + pts.join(", ") + ")";
+    }
+
+    const _headTop = new THREE.Vector3();
+    function showBubble(ms) {
+      if (!shown) return;
+      if (!compact) {
+        const p = projectToPx(model.headTop(_headTop));
+        bubble.style.left = "auto";
+        bubble.style.right = Math.max(0, viewW - p.x - 14).toFixed(0) + "px";
+        bubble.style.bottom = Math.max(0, viewH - p.y + 6).toFixed(0) + "px";
+      } else {
+        bubble.style.left = bubble.style.right = bubble.style.bottom = "";
+      }
+      bubble.classList.add("show");
+      bubbleState.hideAt = clock + (ms || 2800) / 1000;
+    }
+
+    function hideBubble() {
+      bubble.classList.remove("show");
+      bubbleState.hideAt = 0;
+    }
+
+    // ---------- HUD ----------
+    function titlesUntil(threshold, all) {
+      for (let k = 1; all.watched + k <= all.total; k++) {
+        if (MP.percent(all.watched + k, all.total) >= threshold) return k;
+      }
+      return null;
+    }
+
+    function updateHud() {
+      if (hud.hidden) return;
+      const preview = debugPercent != null;
+      const all = MP.profile() ? MP.stats().all : { total: 0, watched: 0, percent: 0 };
+      const p = preview ? debugPercent : all.percent;
+      const st = stageFor(p);
+      hudRef.stage.textContent = st.name;
+      hudRef.step.textContent = "Stufe " + (st.index + 1) + "/" + STAGES.length;
+      hudPips.forEach((pip, i) => pip.classList.toggle("on", i <= st.index));
+      hudRef.percent.textContent = Math.round(p) + " %";
+      hudRef.fill.style.width = clamp(p, 0, 100) + "%";
+      hudBar.setAttribute("aria-valuenow", String(Math.round(p)));
+      hudRef.count.textContent = preview
+        ? "Vorschau mit fiktivem Fortschritt"
+        : all.watched + " von " + all.total + " Titeln gesehen";
+      if (st.index >= STAGES.length - 1) {
+        hudRef.next.textContent = "Maximale Stufe erreicht";
+      } else {
+        const nxt = STAGES[st.index + 1];
+        const n = preview ? null : titlesUntil(nxt.from, all);
+        hudRef.next.textContent = nxt.name + " ab " + nxt.from + " %" + (n != null ? " · noch " + n + " Titel" : "");
+      }
+    }
+
+    function openHud() {
+      if (!shown) return;
+      hud.hidden = false;
+      hit.setAttribute("aria-expanded", "true");
+      widget.classList.add("groot-hud-open");
+      updateHud();
+    }
+
+    function closeHud(focusBack) {
+      if (hud.hidden) return;
+      hud.hidden = true;
+      hit.setAttribute("aria-expanded", "false");
+      widget.classList.remove("groot-hud-open");
+      if (focusBack) hit.focus({ preventScroll: true });
+    }
+
+    hit.addEventListener("click", () => {
+      if (hud.hidden) {
+        openHud();
+        showBubble();
+        if (!reduce) startWave();
+        if (HUD && HUD.playClick) HUD.playClick();
+      } else {
+        closeHud();
+      }
+    });
+    hit.addEventListener("pointerenter", () => (hoverTarget = 1));
+    hit.addEventListener("pointerleave", () => (hoverTarget = 0));
+    hit.addEventListener("focus", () => (hoverTarget = 1));
+    hit.addEventListener("blur", () => (hoverTarget = 0));
+    hud.querySelector(".groot-hud-close").addEventListener("click", () => closeHud(true));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !hud.hidden) closeHud(true);
+    });
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (hud.hidden) return;
+        if (hud.contains(e.target) || hit.contains(e.target)) return;
+        closeHud();
+      },
+      true
+    );
+
+    // ---------- Sichtbarkeit & Pausen ----------
+    const jarvisPanel = document.getElementById("jarvis-panel");
+    function computeShown() {
+      if (!MP.profile() && debugPercent == null) return false;
+      if (document.body.classList.contains("panel-open")) return false;
+      // Das J.A.R.V.I.S.-Chatfenster liegt ohnehin über Groot — dann ruht er.
+      if (jarvisPanel && !jarvisPanel.classList.contains("hidden")) return false;
+      return true;
+    }
+
+    function updateShown() {
+      const s = computeShown();
+      if (s === shown) return;
+      shown = s;
+      widget.classList.toggle("groot-shown", s);
+      widget.setAttribute("aria-hidden", s ? "false" : "true");
+      if (!s) {
+        closeHud();
+        hideBubble();
+      } else {
+        hitDirty = true;
+      }
+      updateRun();
+    }
+
+    function updateRun() {
+      const should = shown && !paused && !document.hidden;
+      if (should === running) return;
+      running = should;
+      if (running) {
+        lastFrame = performance.now();
+        rafId = requestAnimationFrame(loop);
+        if (pendingGrowth) {
+          const pg = pendingGrowth;
+          pendingGrowth = null;
+          startGrowth(pg.to, pg.celebrate && pg.to >= anim.g - 1e-6, 0.45);
+        }
+      } else {
+        cancelAnimationFrame(rafId);
+      }
+    }
+
+    const mo = new MutationObserver(updateShown);
+    mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    if (jarvisPanel) mo.observe(jarvisPanel, { attributes: true, attributeFilter: ["class"] });
+    document.addEventListener("visibilitychange", updateRun);
+
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(widget);
+    window.addEventListener("resize", resize);
+
+    // ---------- Wachstum ----------
+    // Läuft Groot gerade nicht (z.B. hinter „Entdecken“ oder dem Film-Fenster,
+    // wo Titel meist markiert werden), wird die Animation nachgeholt, sobald er
+    // wieder sichtbar ist.
+    let pendingGrowth = null;
+    function growTo(g, mode) {
+      if (mode === "instant") {
+        pendingGrowth = null;
+        anim.active = false;
+        glow.t = -100;
+        setGrowth(g);
+        return;
+      }
+      const celebrate = mode === "celebrate";
+      if (!running) {
+        pendingGrowth = { to: g, celebrate: celebrate || Boolean(pendingGrowth && pendingGrowth.celebrate) };
+        return;
+      }
+      startGrowth(g, celebrate, 0);
+    }
+
+    function startGrowth(g, celebrate, extraDelay) {
+      anim.from = anim.g;
+      anim.to = g;
+      anim.t = 0;
+      anim.celebrate = celebrate && !reduce;
+      anim.delay = (anim.celebrate ? 0.3 : 0) + extraDelay;
+      anim.dur = reduce ? 0.35 : celebrate ? 2.1 : 1.2;
+      anim.active = true;
+      if (celebrate) {
+        glow.t = -extraDelay;
+        glow.dur = reduce ? 0.9 : 2.7;
+        if (!reduce) spawnEffects(extraDelay);
+      }
+    }
+
+    function spawnEffects(delay) {
+      const em = model.emitters();
+      particles.forEach((p, i) => {
+        const a = Math.random() * Math.PI * 2;
+        const rad = em.radius * (0.4 + Math.random() * 0.9);
+        p.pos.set(Math.cos(a) * rad, lerp(em.y0, em.y1, Math.random()), Math.sin(a) * rad * 0.6);
+        p.vel.set(Math.cos(a) * (0.25 + Math.random() * 0.4), 0.45 + Math.random() * 0.55, Math.sin(a) * 0.3 + 0.2);
+        p.axis.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+        p.rot = Math.random() * 6;
+        p.spin = (Math.random() - 0.5) * 9;
+        p.size = 0.07 + Math.random() * 0.06;
+        p.life = 1.5 + Math.random() * 0.9;
+        p.age = -i * 0.03 - delay;
+      });
+      particleMesh.visible = true;
+      sparkData.forEach((s, i) => {
+        s.a = Math.random() * Math.PI * 2;
+        s.r = PLAT_R * (0.3 + Math.random() * 0.65);
+        s.y = 0;
+        s.v = 0.5 + Math.random() * 0.9;
+        s.delay = Math.random() * 0.9 + i * 0.005 + delay;
+      });
+      sparks.visible = true;
+    }
+
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _sc = new THREE.Vector3();
+    function updateEffects(dt) {
+      if (particleMesh.visible) {
+        let alive = 0;
+        particles.forEach((p, i) => {
+          p.age += dt;
+          let s = 0;
+          if (p.age > 0 && p.age < p.life) {
+            alive++;
+            p.vel.y -= 0.12 * dt;
+            p.vel.multiplyScalar(0.985);
+            p.pos.addScaledVector(p.vel, dt);
+            p.rot += p.spin * dt;
+            const k = p.age / p.life;
+            s = p.size * Math.sin(Math.PI * Math.min(1, k * 1.15)) ** 0.6;
+          } else if (p.age <= 0) {
+            alive++;
+          }
+          _q.setFromAxisAngle(p.axis, p.rot);
+          _m.compose(p.pos, _q, _sc.set(s + 1e-4, s + 1e-4, s + 1e-4));
+          particleMesh.setMatrixAt(i, _m);
+        });
+        particleMesh.instanceMatrix.needsUpdate = true;
+        if (!alive) particleMesh.visible = false;
+      }
+      if (sparks.visible) {
+        let alive = 0;
+        let fade = 0;
+        const yMax = model.height() * 1.05;
+        sparkData.forEach((s, i) => {
+          s.delay -= dt;
+          if (s.delay < 0) s.y += s.v * dt;
+          if (s.y < yMax) alive++;
+          sparkPos[i * 3] = Math.cos(s.a + s.y * 1.5) * s.r * (1 - s.y * 0.15);
+          sparkPos[i * 3 + 1] = s.delay < 0 && s.y < yMax ? s.y : -50;
+          sparkPos[i * 3 + 2] = Math.sin(s.a + s.y * 1.5) * s.r * (1 - s.y * 0.15);
+          fade = Math.max(fade, s.delay < 0 ? 1 - s.y / yMax : 0);
+        });
+        sparkGeo.attributes.position.needsUpdate = true;
+        sparkMat.color.setRGB(0.45, 1.0, 0.6).multiplyScalar(0.25 + 0.75 * clamp(fade, 0, 1));
+        if (!alive) sparks.visible = false;
+      }
+    }
+
+    function startWave() {
+      if (wave.t < 0) wave.t = 0;
+    }
+
+    // ---------- Synchronisierung mit MarvelProgress ----------
+    function targetGrowth() {
+      return growthFor(currentPercent());
+    }
+
+    function refreshFromProgress(mode) {
+      const pct = currentPercent();
+      platUniforms.uProgress.value = pct / 100;
+      widget.style.setProperty("--groot-p", String(pct));
+      growTo(targetGrowth(), mode);
+      updateHud();
+    }
+
+    let swapTimer = 0;
+    function swapProfile() {
+      // Profilwechsel: kurz ausblenden, neue Stufe setzen, wieder einblenden
+      clearTimeout(swapTimer);
+      if (!shown || reduce) {
+        refreshFromProgress("instant");
+        updateShown();
+        return;
+      }
+      widget.classList.add("groot-swap");
+      swapTimer = setTimeout(() => {
+        refreshFromProgress("instant");
+        widget.classList.remove("groot-swap");
+        updateShown();
+      }, 230);
+    }
+
+    MP.subscribe((ev) => {
+      if (ev.type === "watched") {
+        refreshFromProgress(ev.value ? "celebrate" : "shrink");
+      } else if (ev.type === "profile" || ev.type === "sync") {
+        if (!MP.profile()) {
+          updateShown();
+          refreshFromProgress("instant");
+        } else if (!shown) {
+          refreshFromProgress("instant");
+          updateShown();
+        } else {
+          swapProfile();
+        }
+      } else if (ev.type === "achievement" || ev.type === "universe-complete") {
+        if (!reduce && shown) startWave();
+      }
+    });
+
+    // =====================================================================
+    // Animation
+    // =====================================================================
+    function damp(cur, target, rate, dt) {
+      return lerp(cur, target, 1 - Math.exp(-rate * dt));
+    }
+
+    // Zeitsteuerung von Atmen, Blick, Winken und Blinzeln; wie das aussieht,
+    // entscheidet das Modell in pose().
+    function animateIdle(dt) {
+      const t = clock;
+      const ps = poseState;
+
+      // Atmen
+      const br = Math.sin(t * ((Math.PI * 2) / 3.8));
+      const breathAmp = reduce ? 0.0025 : 0.011;
+      ps.breath = br * breathAmp;
+
+      // Grundhaltung: leicht zur Bildschirmmitte gedreht
+      const baseYaw = (compact ? compactSide : -1) * 0.24;
+      ps.bodyYaw = baseYaw + (reduce ? 0 : Math.sin(t * 0.33) * 0.07);
+
+      // Kopf: gelegentlich umsehen, neigen; meist zum Betrachter
+      if (!reduce) {
+        look.next -= dt;
+        if (look.next <= 0) {
+          const toViewer = Math.random() < 0.45;
+          look.tYaw = toViewer ? -baseYaw * 0.6 : (Math.random() - 0.5) * 0.9;
+          look.tPitch = toViewer ? -0.04 : (Math.random() - 0.4) * 0.3;
+          look.tRoll = (Math.random() - 0.5) * (toViewer ? 0.32 : 0.2);
+          look.next = 1.8 + Math.random() * 3.4;
+        }
+      } else {
+        look.tYaw = look.tPitch = look.tRoll = 0;
+      }
+      let waveK = 0;
+      if (wave.t >= 0) {
+        wave.t += dt;
+        waveK = smoothstep(0, 0.45, wave.t) * (1 - smoothstep(wave.dur - 0.5, wave.dur, wave.t));
+        if (wave.t >= wave.dur) {
+          wave.t = -1;
+          wave.next = 16 + Math.random() * 16;
+        }
+      } else if (!reduce) {
+        wave.next -= dt;
+        if (wave.next <= 0) startWave();
+      }
+      look.yaw = damp(look.yaw, lerp(look.tYaw, -baseYaw * 0.5, waveK), 3.2, dt);
+      look.pitch = damp(look.pitch, lerp(look.tPitch, -0.06, waveK), 3.2, dt);
+      look.roll = damp(look.roll, lerp(look.tRoll, 0.12, waveK), 3.2, dt);
+
+      // Blinzeln (gelegentlich doppelt)
+      blink.next -= dt;
+      if (blink.t < 0 && blink.next <= 0) blink.t = 0;
+      let closed = 0;
+      if (blink.t >= 0) {
+        blink.t += dt;
+        const d = 0.17;
+        closed = Math.sin(Math.PI * clamp(blink.t / d, 0, 1));
+        if (blink.t >= d) {
+          blink.t = -1;
+          blink.second = !blink.second && Math.random() < 0.2;
+          blink.next = blink.second ? 0.12 : (reduce ? 4 : 2.2) + Math.random() * 3.6;
+        }
+      }
+
+      ps.time = t;
+      ps.reduceMotion = reduce;
+      ps.compact = compact;
+      ps.yaw = look.yaw;
+      ps.pitch = look.pitch;
+      ps.roll = look.roll;
+      ps.blink = closed;
+      ps.wave = waveK;
+      // Es winkt der zur Bildmitte zeigende Arm
+      ps.waveSide = compact ? compactSide : -1;
+      ps.waveTime = wave.t;
+      model.pose(ps, dt);
+      posed = true;
+
+      // Blätter-Partikel flattern wie die Blätter der Figur
+      fxUniforms.uFlutter.value = reduce ? 0.2 : 1;
+    }
+
+    function update(dt) {
+      clock += dt;
+      fxUniforms.uTime.value = clock;
+      platUniforms.uTime.value = reduce ? 0 : clock;
+
+      if (anim.active) {
+        anim.t += dt;
+        const k = clamp((anim.t - anim.delay) / anim.dur, 0, 1);
+        const e = anim.celebrate ? easeOutBack(k) : easeInOut(k);
+        setGrowth(lerp(anim.from, anim.to, e));
+        if (k >= 1) {
+          anim.active = false;
+          setGrowth(anim.to);
+          if (anim.celebrate) showBubble(2600);
+        }
+      }
+
+      let glowV = 0;
+      if (glow.t > -10) {
+        glow.t += dt;
+        glowV = smoothstep(0, 0.35, glow.t) * (1 - smoothstep(glow.dur - 1.0, glow.dur, glow.t));
+        glowV *= 0.85 + 0.15 * Math.sin(glow.t * 14);
+        if (glow.t >= glow.dur) glow.t = -100;
+      }
+      glowValue = glowV;
+      model.setGlow(glowV);
+      fxUniforms.uGlow.value = glowV;
+      platUniforms.uPulse.value = glowV;
+      platLight.color.setHex(glowV > 0.05 ? 0x5dffa0 : 0x46d8ff);
+      platLight.intensity = 1.1 + glowV * 1.5;
+
+      hover = damp(hover, hoverTarget, 8, dt);
+      platUniforms.uHover.value = hover;
+
+      animateIdle(dt);
+      updateEffects(dt);
+
+      // Sprechblase: selten von selbst, sonst nach Klick/Wachstum
+      if (bubbleState.hideAt && clock >= bubbleState.hideAt) hideBubble();
+      bubbleState.next -= dt;
+      if (bubbleState.next <= 0) {
+        bubbleState.next = 40 + Math.random() * 50;
+        showBubble();
+      }
+    }
+
+    let frameCount = 0;
+    function renderOnce() {
+      if (hitDirty) updateHitArea();
+      renderer.render(scene, camera);
+    }
+
+    function loop(now) {
+      if (!running) return;
+      rafId = requestAnimationFrame(loop);
+      const elapsed = now - lastFrame;
+      if (elapsed < 1000 / 30 - 3) return; // ~30 fps genügen für die kleine Figur
+      lastFrame = now;
+      try {
+        update(Math.min(0.1, elapsed / 1000));
+        frameCount++;
+        if (hitDirty && (frameCount % 6 === 0 || !anim.active)) updateHitArea();
+      } catch (err) {
+        // Fehler eines externen Modells: zurück zum Platzhalter statt eines Fehlers je Frame
+        if (modelName === "procedural") throw err;
+        modelFailed(modelName, err);
+        return;
+      }
+      renderer.render(scene, camera);
+    }
+
+    // ---------- Öffentliche API ----------
+    api.setPaused = (v) => {
+      paused = Boolean(v);
+      updateRun();
+    };
+    api.refresh = () => {
+      refreshFromProgress("instant");
+      updateShown();
+    };
+    api.debugSetPercent = (p) => {
+      debugPercent = p == null || p === "" ? null : clamp(Number(p) || 0, 0, 100);
+      refreshFromProgress("instant");
+      updateShown();
+      if (shown) renderOnce();
+    };
+    api.debugInfo = () => {
+      model.bounds(_box);
+      const size = model.height();
+      return {
+        percent: currentPercent(),
+        stage: stageFor(currentPercent()),
+        growth: anim.g,
+        target: targetGrowth(),
+        animating: anim.active,
+        glow: glowValue,
+        effects: particleMesh.visible || sparks.visible,
+        height: _box.max.y - _box.min.y,
+        // Körpergröße laut Proportionen (ohne Idle-Bewegung wie erhobene Arme)
+        size,
+        headRatio: model.head().size / size,
+        triangles: renderer.info.render.triangles,
+        waving: wave.t >= 0,
+        headTurn: Math.abs(look.pitch) + Math.abs(look.yaw) + Math.abs(look.roll),
+        shown,
+        running,
+        compact,
+        paused,
+        model: modelName,
+        modelPending,
+        modelError,
+        modelTriangles: typeof model.triangles === "function" ? model.triangles() : null,
+      };
+    };
+
+    // ---------- Start ----------
+    resize();
+    refreshFromProgress("instant");
+    // Alle Shader vorab übersetzen — auch die der (noch unsichtbaren) Effekte,
+    // sonst stockt die erste Wachstumsanimation.
+    const hiddenForCompile = [particleMesh, sparks, platform].filter((o) => !o.visible);
+    hiddenForCompile.forEach((o) => (o.visible = true));
+    renderer.compile(scene, camera);
+    hiddenForCompile.forEach((o) => (o.visible = false));
+    updateShown();
+    if (shown) renderOnce();
+    onModelWish = requestModel;
+  }
+
+  // =====================================================================
+  // Gemeinsame Bausteine (Komponente und prozeduraler Platzhalter)
+  // =====================================================================
+  function makeRng(seed) {
+    let s = seed >>> 0 || 1;
+    return function () {
+      s ^= s << 13;
+      s >>>= 0;
+      s ^= s >>> 17;
+      s ^= s << 5;
+      s >>>= 0;
+      return s / 4294967296;
+    };
+  }
+
+  function add(parent, obj) {
+    parent.add(obj);
+    return obj;
+  }
+
+  function mesh(geo, mat, parent) {
+    const m = new THREE.Mesh(geo, mat);
+    if (parent) parent.add(m);
+    return m;
+  }
+
+  function group(parent) {
+    const g = new THREE.Group();
+    if (parent) parent.add(g);
+    return g;
+  }
+
+  function leafGeometry() {
+    return new THREE.PlaneGeometry(0.75, 1, 1, 2).translate(0, 0.5, 0);
+  }
+
+  // ---------- Texturen (Canvas, keine Dateien) ----------
+  function leafTexture() {
+    const c = document.createElement("canvas");
+    c.width = 96;
+    c.height = 128;
+    const x = c.getContext("2d");
+    const path = () => {
+      x.beginPath();
+      x.moveTo(48, 124);
+      x.bezierCurveTo(8, 104, 6, 46, 48, 5);
+      x.bezierCurveTo(90, 46, 88, 104, 48, 124);
+      x.closePath();
+    };
+    const grad = x.createLinearGradient(0, 124, 0, 4);
+    grad.addColorStop(0, "#173f12");
+    grad.addColorStop(0.5, "#2f7a1f");
+    grad.addColorStop(1, "#6cb83a");
+    path();
+    x.fillStyle = grad;
+    x.fill();
+    // Seitliche Aufhellung (Wölbung)
+    const side = x.createLinearGradient(8, 0, 88, 0);
+    side.addColorStop(0, "rgba(0,0,0,0.28)");
+    side.addColorStop(0.5, "rgba(255,255,255,0.06)");
+    side.addColorStop(1, "rgba(0,0,0,0.2)");
+    x.fillStyle = side;
+    x.fill();
+    // Blattadern
+    x.strokeStyle = "rgba(170,230,120,0.6)";
+    x.lineWidth = 2.4;
+    x.beginPath();
+    x.moveTo(48, 122);
+    x.quadraticCurveTo(47, 60, 48, 12);
+    x.stroke();
+    x.lineWidth = 1.2;
+    x.strokeStyle = "rgba(160,225,110,0.35)";
+    for (let i = 0; i < 6; i++) {
+      const y = 100 - i * 14;
+      x.beginPath();
+      x.moveTo(48, y);
+      x.quadraticCurveTo(34, y - 8, 22 + i * 2, y - 18);
+      x.moveTo(48, y);
+      x.quadraticCurveTo(62, y - 8, 74 - i * 2, y - 18);
+      x.stroke();
+    }
+    path();
+    x.strokeStyle = "rgba(20,60,15,0.9)";
+    x.lineWidth = 2;
+    x.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    return tex;
+  }
+
+  // Blattmaterial; u = { uTime, uGlow, uGlowColor, uFlutter } (geteilte Uniforms)
+  function leafMaterial(tex, u, glowScale) {
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      alphaTest: 0.45,
+      side: THREE.DoubleSide,
+      roughness: 0.6,
+      metalness: 0,
+      emissive: 0x0b2208,
+    });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = u.uTime;
+      shader.uniforms.uGlow = u.uGlow;
+      shader.uniforms.uGlowColor = u.uGlowColor;
+      shader.uniforms.uFlutter = u.uFlutter;
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uFlutter;")
+        .replace(
+          "#include <begin_vertex>",
+          // Blätter flattern leicht, jede Instanz mit eigener Phase
+          `#include <begin_vertex>
+          #ifdef USE_INSTANCING
+            float leafPh = instanceMatrix[3][0] * 17.0 + instanceMatrix[3][1] * 11.0 + instanceMatrix[3][2] * 7.0;
+          #else
+            float leafPh = 0.0;
+          #endif
+          float leafF = sin(uTime * 2.4 + leafPh) * uFlutter * uv.y;
+          transformed.z += leafF * 0.22;
+          transformed.x += leafF * 0.07;`
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uGlow;\nuniform vec3 uGlowColor;")
+        .replace(
+          "#include <emissivemap_fragment>",
+          "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uGlowColor * uGlow * " + glowScale.toFixed(2) + ";"
+        );
+    };
+    mat.customProgramCacheKey = () => "groot-leaf-" + glowScale;
+    return mat;
+  }
+
+  // =====================================================================
+  // Modell „procedural“: stilisierter Platzhalter (Rig + Proportions-Keyframes)
+  // =====================================================================
+  // Erfüllt die Modell-Schnittstelle (siehe oben). Alles Figur-Spezifische
+  // liegt hier: Geometrie, Rinden-/Blattmaterialien, Rig, FORMS/applyForm und
+  // die Posen von Körper, Kopf, Lidern und Armen. Braucht keinen ctx — THREE
+  // und die gemeinsamen Bausteine liegen in diesem Skript.
+  function createProceduralModel() {
     function scaleUV(geo, u, v) {
       const uv = geo.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * u, uv.getY(i) * v);
@@ -254,60 +1523,6 @@
       return { geo, curve };
     }
 
-    // ---------- Texturen (Canvas, keine Dateien) ----------
-    function leafTexture() {
-      const c = document.createElement("canvas");
-      c.width = 96;
-      c.height = 128;
-      const x = c.getContext("2d");
-      const path = () => {
-        x.beginPath();
-        x.moveTo(48, 124);
-        x.bezierCurveTo(8, 104, 6, 46, 48, 5);
-        x.bezierCurveTo(90, 46, 88, 104, 48, 124);
-        x.closePath();
-      };
-      const grad = x.createLinearGradient(0, 124, 0, 4);
-      grad.addColorStop(0, "#173f12");
-      grad.addColorStop(0.5, "#2f7a1f");
-      grad.addColorStop(1, "#6cb83a");
-      path();
-      x.fillStyle = grad;
-      x.fill();
-      // Seitliche Aufhellung (Wölbung)
-      const side = x.createLinearGradient(8, 0, 88, 0);
-      side.addColorStop(0, "rgba(0,0,0,0.28)");
-      side.addColorStop(0.5, "rgba(255,255,255,0.06)");
-      side.addColorStop(1, "rgba(0,0,0,0.2)");
-      x.fillStyle = side;
-      x.fill();
-      // Blattadern
-      x.strokeStyle = "rgba(170,230,120,0.6)";
-      x.lineWidth = 2.4;
-      x.beginPath();
-      x.moveTo(48, 122);
-      x.quadraticCurveTo(47, 60, 48, 12);
-      x.stroke();
-      x.lineWidth = 1.2;
-      x.strokeStyle = "rgba(160,225,110,0.35)";
-      for (let i = 0; i < 6; i++) {
-        const y = 100 - i * 14;
-        x.beginPath();
-        x.moveTo(48, y);
-        x.quadraticCurveTo(34, y - 8, 22 + i * 2, y - 18);
-        x.moveTo(48, y);
-        x.quadraticCurveTo(62, y - 8, 74 - i * 2, y - 18);
-        x.stroke();
-      }
-      path();
-      x.strokeStyle = "rgba(20,60,15,0.9)";
-      x.lineWidth = 2;
-      x.stroke();
-      const tex = new THREE.CanvasTexture(c);
-      tex.encoding = THREE.sRGBEncoding;
-      return tex;
-    }
-
     // Auge: Pupille am Nordpol der Kugel (wird nach vorne gedreht), darum eine
     // warme braune Iris mit feinen Strahlen; der Rest bleibt fast schwarz.
     function eyeTexture() {
@@ -338,47 +1553,6 @@
       const tex = new THREE.CanvasTexture(c);
       tex.encoding = THREE.sRGBEncoding;
       return tex;
-    }
-
-    // Weicher Lichtpunkt auf Schwarz (für additive Funken).
-    function sparkTexture() {
-      const c = document.createElement("canvas");
-      c.width = c.height = 32;
-      const x = c.getContext("2d");
-      const g = x.createRadialGradient(16, 16, 0, 16, 16, 16);
-      g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.25, "#9a9a9a");
-      g.addColorStop(1, "#000000");
-      x.fillStyle = g;
-      x.fillRect(0, 0, 32, 32);
-      return new THREE.CanvasTexture(c);
-    }
-
-    function blobTexture() {
-      const c = document.createElement("canvas");
-      c.width = c.height = 64;
-      const x = c.getContext("2d");
-      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, "rgba(0,0,0,0.85)");
-      g.addColorStop(0.55, "rgba(0,0,0,0.45)");
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      x.fillStyle = g;
-      x.fillRect(0, 0, 64, 64);
-      return new THREE.CanvasTexture(c);
-    }
-
-    // Additives Leuchten, das den Alphakanal des Canvas nicht verändert: die
-    // Plattform „strahlt“ dadurch auf die Seite dahinter, statt sie abzudunkeln.
-    function glowBlend(mat) {
-      mat.transparent = true;
-      mat.depthWrite = false;
-      mat.blending = THREE.CustomBlending;
-      mat.blendEquation = THREE.AddEquation;
-      mat.blendSrc = THREE.OneFactor;
-      mat.blendDst = THREE.OneFactor;
-      mat.blendSrcAlpha = THREE.ZeroFactor;
-      mat.blendDstAlpha = THREE.OneFactor;
-      return mat;
     }
 
     // ---------- Rinden-Shader (MeshStandardMaterial + onBeforeCompile) ----------
@@ -586,46 +1760,6 @@
     const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
 
     const leafTex = leafTexture();
-    function leafMaterial(glowScale) {
-      const mat = new THREE.MeshStandardMaterial({
-        map: leafTex,
-        alphaTest: 0.45,
-        side: THREE.DoubleSide,
-        roughness: 0.6,
-        metalness: 0,
-        emissive: 0x0b2208,
-      });
-      mat.onBeforeCompile = (shader) => {
-        shader.uniforms.uTime = shared.uTime;
-        shader.uniforms.uGlow = shared.uGlow;
-        shader.uniforms.uGlowColor = shared.uGlowColor;
-        shader.uniforms.uFlutter = shared.uFlutter;
-        shader.vertexShader = shader.vertexShader
-          .replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uFlutter;")
-          .replace(
-            "#include <begin_vertex>",
-            // Blätter flattern leicht, jede Instanz mit eigener Phase
-            `#include <begin_vertex>
-            #ifdef USE_INSTANCING
-              float leafPh = instanceMatrix[3][0] * 17.0 + instanceMatrix[3][1] * 11.0 + instanceMatrix[3][2] * 7.0;
-            #else
-              float leafPh = 0.0;
-            #endif
-            float leafF = sin(uTime * 2.4 + leafPh) * uFlutter * uv.y;
-            transformed.z += leafF * 0.22;
-            transformed.x += leafF * 0.07;`
-          );
-        shader.fragmentShader = shader.fragmentShader
-          .replace("#include <common>", "#include <common>\nuniform float uGlow;\nuniform vec3 uGlowColor;")
-          .replace(
-            "#include <emissivemap_fragment>",
-            "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uGlowColor * uGlow * " + glowScale.toFixed(2) + ";"
-          );
-      };
-      mat.customProgramCacheKey = () => "groot-leaf-" + glowScale;
-      return mat;
-    }
-
     // ---------- Gemeinsame Basisgeometrien ----------
     const sphereGeo = scaleUV(new THREE.SphereGeometry(1, 14, 10), 2, 1);
     // Pole auf der x-Achse: die Maserung läuft entlang länglicher Querteile (Brauen)
@@ -634,25 +1768,14 @@
     const eyeGeo = new THREE.SphereGeometry(1, 16, 12);
     const lidGeo = scaleUV(new THREE.SphereGeometry(1.08, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), 6, 0.6);
     const glintGeo = new THREE.SphereGeometry(1, 6, 5);
-    const leafGeo = new THREE.PlaneGeometry(0.75, 1, 1, 2).translate(0, 0.5, 0);
-
-    // ---------- Lichter ----------
-    scene.add(new THREE.HemisphereLight(0x9cc4ff, 0x1c1008, 0.42));
-    const key = add(scene, new THREE.DirectionalLight(0xffe2c4, 1.7));
-    key.position.set(3.6, 4.2, 3.4);
-    const fill = add(scene, new THREE.DirectionalLight(0x86aaff, 0.38));
-    fill.position.set(-4.5, 1.0, 3);
-    const rimBlue = add(scene, new THREE.DirectionalLight(0x5abeff, 0.75));
-    rimBlue.position.set(-3.5, 2.4, -4);
-    const rimGreen = add(scene, new THREE.DirectionalLight(0x7dff9a, 0.45));
-    rimGreen.position.set(3.8, 2.0, -3.6);
-    const platLight = add(scene, new THREE.PointLight(0x46d8ff, 0.7, 2.6, 2));
-    platLight.position.set(0, 0.35, 0.6);
+    const leafGeo = leafGeometry();
 
     // =====================================================================
-    // Figur
+    // Figur (Fußpunkt y = 0, Blick nach +z)
     // =====================================================================
-    const fig = group(scene);
+    const root = new THREE.Group();
+    root.name = "groot-procedural";
+    const fig = group(root);
     const hips = group(fig);
     const spine = group(hips);
     const leafAnchors = []; // { parent, matrix, th, kind }
@@ -1005,159 +2128,12 @@
       { d: [-0.45, 0.7, -0.9], len: 0.75, th: 0.82, twigs: 1, leaves: 2, leafTh: 0.85, side: -1 },
     ].forEach((spec, i) => registerBranch(spine, "back", spec, 900 + i * 17));
 
-    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMaterial(0.25), leafAnchors.length);
+    // Die Blätter liegen neben der Figur unter root; ihre Matrizen sind
+    // Weltmatrizen (root bleibt im Ursprung, siehe Schnittstelle).
+    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMaterial(leafTex, shared, 0.25), leafAnchors.length);
     leafMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     leafMesh.frustumCulled = false;
-    scene.add(leafMesh);
-
-    // =====================================================================
-    // JARVIS-Plattform
-    // =====================================================================
-    const PLAT_R = 0.78;
-    const platform = group(scene);
-    const platUniforms = {
-      uTime: { value: 0 },
-      uProgress: { value: 0 },
-      uPulse: { value: 0 },
-      uHover: { value: 0 },
-    };
-    const base = mesh(
-      new THREE.CylinderGeometry(PLAT_R * 0.98, PLAT_R * 0.84, 0.1, 48, 1, false),
-      new THREE.MeshStandardMaterial({ color: 0x070c16, metalness: 0.75, roughness: 0.34, emissive: 0x01050b }),
-      platform
-    );
-    base.position.y = -0.052;
-    const shadow = mesh(
-      new THREE.CircleGeometry(0.62, 32),
-      new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false, toneMapped: false }),
-      platform
-    );
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = 0.003;
-    shadow.renderOrder = 1;
-
-    const DISC_R = PLAT_R * 1.25;
-    const disc = mesh(
-      new THREE.CircleGeometry(DISC_R, 72),
-      glowBlend(
-        new THREE.ShaderMaterial({
-          uniforms: platUniforms,
-          // fwidth braucht unter WebGL1 die Ableitungs-Erweiterung
-          extensions: { derivatives: true },
-          vertexShader: `
-            varying vec2 vPos;
-            void main() {
-              vPos = position.xy / ${DISC_R.toFixed(4)};
-              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }`,
-          fragmentShader: `
-            uniform float uTime;
-            uniform float uProgress;
-            uniform float uPulse;
-            uniform float uHover;
-            varying vec2 vPos;
-            float ring(float r, float c, float w) { return 1.0 - smoothstep(0.0, w, abs(r - c)); }
-            void main() {
-              float r = length(vPos);
-              if (r > 1.0) discard;
-              float a = atan(vPos.y, vPos.x);
-              float a01 = fract((a + 1.5707963) / 6.2831853);
-              vec3 cyan = vec3(0.26, 0.72, 1.0);
-              vec3 green = vec3(0.36, 1.0, 0.55);
-              vec3 gold = vec3(1.0, 0.78, 0.3);
-              float fw = fwidth(r) * 1.2;
-              vec3 col = cyan * smoothstep(0.8, 0.0, r) * 0.03;
-              col += cyan * ring(r, 0.2, fw + 0.006) * 0.26;
-              col += cyan * ring(r, 0.47, fw + 0.004) * 0.2 * step(0.45, fract(a01 * 40.0 + uTime * 0.05));
-              float seg = step(0.0, sin((a01 * 3.0 - uTime * 0.06) * 6.2831853) + 0.4);
-              col += cyan * ring(r, 0.62, fw + 0.01) * 0.3 * seg;
-              float track = ring(r, 0.76, fw + 0.014);
-              float filled = step(a01, uProgress);
-              col += mix(cyan * 0.08, mix(green, gold, a01) * 0.95, filled) * track;
-              float mk = 0.0;
-              for (int i = 1; i < 5; i++) mk += 1.0 - smoothstep(0.0, 0.006, abs(a01 - float(i) * 0.2));
-              col += gold * mk * ring(r, 0.76, 0.045) * 0.6;
-              float tick = step(0.8, fract(a01 * 72.0)) * ring(r, 0.86, 0.02);
-              col += cyan * tick * 0.22;
-              col += cyan * ring(r, 0.97, fw + 0.02) * 0.18;
-              float sweep = pow(max(0.0, cos(a - uTime * 0.7)), 24.0) * smoothstep(0.8, 0.15, r);
-              col += cyan * sweep * 0.1;
-              col *= 0.8 + 0.2 * sin(vPos.y * 90.0 - uTime * 3.0);
-              float wave = ring(r, 0.18 + fract(uTime * 0.7) * 0.75, 0.06);
-              col += green * uPulse * (wave * 0.6 + smoothstep(0.8, 0.0, r) * 0.22);
-              col *= 1.0 + uHover * 0.6;
-              gl_FragColor = vec4(col, 1.0);
-            }`,
-        })
-      ),
-      platform
-    );
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = 0.004;
-    disc.renderOrder = 2;
-
-    const rimMat = glowBlend(new THREE.MeshBasicMaterial({ color: 0x2a86d6, toneMapped: false }));
-    const rimRing = mesh(new THREE.TorusGeometry(PLAT_R * 0.98, 0.011, 4, 72), rimMat, platform);
-    rimRing.rotation.x = Math.PI / 2;
-    rimRing.renderOrder = 3;
-    const lowRing = mesh(new THREE.TorusGeometry(PLAT_R * 0.85, 0.008, 4, 64), rimMat, platform);
-    lowRing.rotation.x = Math.PI / 2;
-    lowRing.position.y = -0.1;
-    lowRing.renderOrder = 3;
-
-    const beamUniforms = { uTime: platUniforms.uTime, uPulse: platUniforms.uPulse };
-    const beam = mesh(
-      new THREE.CylinderGeometry(PLAT_R * 0.9, PLAT_R * 0.96, 0.5, 48, 1, true).translate(0, 0.25, 0),
-      glowBlend(
-        new THREE.ShaderMaterial({
-          uniforms: beamUniforms,
-          side: THREE.DoubleSide,
-          vertexShader: `
-            varying vec2 vUv;
-            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-          fragmentShader: `
-            uniform float uTime;
-            uniform float uPulse;
-            varying vec2 vUv;
-            void main() {
-              float f = pow(1.0 - vUv.y, 2.6);
-              float lines = 0.7 + 0.3 * sin(vUv.y * 70.0 - uTime * 4.0);
-              vec3 c = mix(vec3(0.2, 0.62, 1.0), vec3(0.35, 1.0, 0.55), uPulse);
-              gl_FragColor = vec4(c * f * lines * (0.035 + uPulse * 0.16), 1.0);
-            }`,
-        })
-      ),
-      platform
-    );
-    beam.renderOrder = 4;
-
-    // =====================================================================
-    // Wachstums-Effekte: fliegende Blätter + Funken
-    // =====================================================================
-    const P_COUNT = 22;
-    const particleMesh = new THREE.InstancedMesh(leafGeo, leafMaterial(0.4), P_COUNT);
-    particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    particleMesh.frustumCulled = false;
-    particleMesh.visible = false;
-    scene.add(particleMesh);
-    const particles = [];
-    for (let i = 0; i < P_COUNT; i++) {
-      particles.push({ age: 1, life: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), axis: new THREE.Vector3(0, 0, 1), rot: 0, spin: 0, size: 0.1 });
-    }
-
-    const S_COUNT = 40;
-    const sparkGeo = new THREE.BufferGeometry();
-    const sparkPos = new Float32Array(S_COUNT * 3);
-    sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
-    const sparkMat = glowBlend(
-      new THREE.PointsMaterial({ size: 0.07, map: sparkTexture(), color: 0x000000, sizeAttenuation: true, toneMapped: false })
-    );
-    const sparks = new THREE.Points(sparkGeo, sparkMat);
-    sparks.frustumCulled = false;
-    sparks.visible = false;
-    scene.add(sparks);
-    const sparkData = [];
-    for (let i = 0; i < S_COUNT; i++) sparkData.push({ a: 0, r: 0, y: 0, v: 0, delay: 0 });
+    root.add(leafMesh);
 
     // =====================================================================
     // Proportionen der Stufen
@@ -1188,8 +2164,8 @@
       return f;
     }
 
-    const _v = new THREE.Vector3();
     let form = formAt(0);
+    let growth = 0;
 
     function figureHeight(P) {
       return P.hip + P.torsoH * 0.93 + P.neckH + P.headH;
@@ -1349,724 +2325,101 @@
       leafMesh.instanceMatrix.needsUpdate = true;
     }
 
-    // =====================================================================
-    // DOM: Trefferfläche, Sprechblase, HUD
-    // =====================================================================
-    const hit = document.createElement("button");
-    hit.type = "button";
-    hit.className = "groot-hit";
-    hit.setAttribute("aria-label", "Groot – Entwicklungsstufe anzeigen");
-    hit.setAttribute("aria-expanded", "false");
-    hit.setAttribute("aria-controls", "groot-hud");
-
-    const bubble = document.createElement("div");
-    bubble.className = "groot-bubble";
-    bubble.setAttribute("aria-hidden", "true");
-    bubble.textContent = "I am Groot.";
-
-    const hud = document.createElement("div");
-    hud.id = "groot-hud";
-    hud.className = "groot-hud";
-    hud.setAttribute("role", "dialog");
-    hud.setAttribute("aria-label", "Groot – Entwicklungsstand");
-    hud.hidden = true;
-    hud.innerHTML = `
-      <div class="groot-hud-top">
-        <span class="panel-eyebrow">BEGLEITER</span>
-        <button type="button" class="groot-hud-close" aria-label="Schließen">✕</button>
-      </div>
-      <h3 class="groot-hud-title">GROOT</h3>
-      <div class="groot-hud-stage"><span data-g="stage"></span><small data-g="step"></small></div>
-      <div class="groot-hud-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="groot-hud-row"><span>Fortschritt</span><strong data-g="percent"></strong></div>
-      <div class="groot-hud-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Fortschritt">
-        <i data-g="fill"></i><b style="left:20%"></b><b style="left:40%"></b><b style="left:60%"></b><b style="left:80%"></b>
-      </div>
-      <div class="groot-hud-count" data-g="count"></div>
-      <div class="groot-hud-next" data-g="next"></div>
-      <p class="groot-hud-note">Stilisierter 3D-Platzhalter – kein offizielles Marvel-Modell</p>`;
-    const hudRef = {};
-    hud.querySelectorAll("[data-g]").forEach((el) => (hudRef[el.dataset.g] = el));
-    const hudPips = hud.querySelectorAll(".groot-hud-pips i");
-    const hudBar = hud.querySelector(".groot-hud-bar");
-
-    widget.textContent = "";
-    widget.append(canvas, hit, bubble, hud);
-    widget.classList.remove("hidden");
-    widget.setAttribute("aria-hidden", "true");
-
-    // =====================================================================
-    // Zustand
-    // =====================================================================
-    let debugPercent = null;
-    let paused = earlyPaused;
-    let shown = false;
-    let running = false;
-    let rafId = 0;
-    let lastFrame = 0;
-    let clock = 0;
-    let compact = false;
-    let compactSide = 1;
-    let viewW = 1;
-    let viewH = 1;
-
-    const anim = { g: 0, from: 0, to: 0, t: 0, dur: 1, delay: 0, active: false, celebrate: false };
-    const glow = { t: -100, dur: 2.6 };
-    const blink = { next: 2.5, t: -1, second: false };
-    const look = { yaw: 0, pitch: 0, roll: 0, tYaw: 0, tPitch: 0, tRoll: 0, next: 1.5 };
-    const wave = { t: -1, dur: 2.6, next: 14 + Math.random() * 12 };
-    const bubbleState = { next: 40 + Math.random() * 50, hideAt: 0 };
-    let hover = 0;
-    let hoverTarget = 0;
-    let hitDirty = true;
-
-    function currentPercent() {
-      if (debugPercent != null) return debugPercent;
-      if (!MP.profile()) return 0;
-      return MP.stats().all.percent;
-    }
-
-    function setGrowth(g) {
-      anim.g = g;
-      applyForm(formAt(g));
-      hitDirty = true;
-      if (compact) placeCamera();
-    }
-
-    // ---------- Kamera ----------
-    const CAM_FOV = 24;
-    function placeCamera() {
-      const tanH = Math.tan((CAM_FOV * Math.PI) / 360);
-      if (!compact) {
-        // Fester Ausschnitt (erwachsener Groot + Plattform), damit das Wachstum sichtbar bleibt
-        const lookY = 1.04;
-        let dist = 6.0;
-        const needW = PLAT_R * 2.3;
-        if (camera.aspect * 2 * dist * tanH < needW) dist = needW / (camera.aspect * 2 * tanH);
-        camera.position.set(0, lookY + dist * 0.095, dist);
-        camera.lookAt(0, lookY, 0);
-      } else {
-        // Kompakt (Smartphone): Kopf/Oberkörper im runden Ausschnitt
-        const P = form;
-        const headC = P.hip + P.torsoH * 0.93 + P.neckH + P.headH * 0.5;
-        const frame = Math.max(P.headH * 2.3, 0.66);
-        const lookY = headC - frame * 0.05;
-        const dist = frame / (2 * tanH) / Math.min(1, camera.aspect);
-        camera.position.set(0, lookY + dist * 0.08, dist);
-        camera.lookAt(0, lookY, 0);
-      }
-      camera.updateProjectionMatrix();
-    }
-
-    function resize() {
-      const w = Math.max(1, widget.clientWidth);
-      const h = Math.max(1, widget.clientHeight);
-      viewW = w;
-      viewH = h;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      const compactNow = compactMQ.matches;
-      if (compactNow !== compact) {
-        compact = compactNow;
-        platform.visible = !compact;
-        widget.classList.toggle("groot-compact", compact);
-      }
-      const rect = widget.getBoundingClientRect();
-      compactSide = rect.left + rect.width / 2 < window.innerWidth / 2 ? 1 : -1;
-      placeCamera();
-      hitDirty = true;
-      if (shown && !running) renderOnce();
-    }
-
-    const compactMQ = window.matchMedia("(max-width: 640px), (max-height: 480px) and (orientation: landscape)");
-
-    // ---------- Trefferfläche & Sprechblase ----------
-    const _box = new THREE.Box3();
-    const _corner = new THREE.Vector3();
-    function projectToPx(v) {
-      _v.copy(v).project(camera);
-      return { x: (_v.x * 0.5 + 0.5) * viewW, y: (-_v.y * 0.5 + 0.5) * viewH };
-    }
-
-    function updateHitArea() {
-      hitDirty = false;
-      if (compact) {
-        hit.style.left = hit.style.top = "0px";
-        hit.style.width = viewW + "px";
-        hit.style.height = viewH + "px";
-        hit.style.clipPath = "";
-        return;
-      }
-      fig.updateMatrixWorld(true);
-      _box.setFromObject(fig);
-      _box.expandByPoint(_corner.set(-PLAT_R, -0.1, PLAT_R));
-      _box.expandByPoint(_corner.set(PLAT_R, -0.1, -PLAT_R));
-      let x0 = Infinity;
-      let y0 = Infinity;
-      let x1 = -Infinity;
-      let y1 = -Infinity;
-      for (let i = 0; i < 8; i++) {
-        _corner.set(i & 1 ? _box.max.x : _box.min.x, i & 2 ? _box.max.y : _box.min.y, i & 4 ? _box.max.z : _box.min.z);
-        const p = projectToPx(_corner);
-        x0 = Math.min(x0, p.x);
-        y0 = Math.min(y0, p.y);
-        x1 = Math.max(x1, p.x);
-        y1 = Math.max(y1, p.y);
-      }
-      x0 = clamp(x0, 0, viewW);
-      x1 = clamp(x1, 0, viewW);
-      y0 = clamp(y0 - 4, 0, viewH);
-      y1 = clamp(y1, 0, viewH);
-      hit.style.left = x0.toFixed(0) + "px";
-      hit.style.top = y0.toFixed(0) + "px";
-      hit.style.width = (x1 - x0).toFixed(0) + "px";
-      hit.style.height = (y1 - y0).toFixed(0) + "px";
-
-      // Klickbar ist nur die Figur (mittlere Säule) und die flache Plattform —
-      // der transparente Raum neben Kopf, Ästen und Armen lässt Klicks zur
-      // 3D-Szene (Planeten, Drehen) durch. clip-path begrenzt auch das Hit-Testing.
-      const c = projectToPx(_corner.set(0, 0.05, 0));
-      const rx = Math.abs(projectToPx(_corner.set(PLAT_R * 0.98, 0.05, 0)).x - c.x);
-      const ry = Math.max(4, Math.abs(projectToPx(_corner.set(0, 0.05, PLAT_R * 0.98)).y - c.y));
-      // Mitte etwas tiefer und großzügiger, damit auch die Vorderkante der
-      // (dicken) Plattform klickbar ist
-      const cx = c.x - x0;
-      const cy = c.y - y0 + ry * 0.25;
-      const rxs = rx * 1.04;
-      const rys = ry * 1.35 + 4;
-      const half = Math.min(rxs * 0.92, Math.max(14, (x1 - x0) * 0.24));
-      const colL = cx - half;
-      const colR = cx + half;
-      const tR = Math.acos(clamp((colR - cx) / rxs, -1, 1));
-      const tL = Math.acos(clamp((colL - cx) / rxs, -1, 1));
-      const pts = [colL + "px 0px", colR + "px 0px"];
-      const steps = 14;
-      const span = tR + (2 * Math.PI - tL);
-      for (let i = 0; i <= steps; i++) {
-        const t = tR - (span * i) / steps;
-        pts.push((cx + rxs * Math.cos(t)).toFixed(1) + "px " + (cy - rys * Math.sin(t)).toFixed(1) + "px");
-      }
-      hit.style.clipPath = "polygon(" + pts.join(", ") + ")";
-    }
-
-    const _headTop = new THREE.Vector3();
-    function showBubble(ms) {
-      if (!shown) return;
-      if (!compact) {
-        fig.updateMatrixWorld(true);
-        headPivot.localToWorld(_headTop.set(0, form.headH * 0.9, 0));
-        const p = projectToPx(_headTop);
-        bubble.style.left = "auto";
-        bubble.style.right = Math.max(0, viewW - p.x - 14).toFixed(0) + "px";
-        bubble.style.bottom = Math.max(0, viewH - p.y + 6).toFixed(0) + "px";
-      } else {
-        bubble.style.left = bubble.style.right = bubble.style.bottom = "";
-      }
-      bubble.classList.add("show");
-      bubbleState.hideAt = clock + (ms || 2800) / 1000;
-    }
-
-    function hideBubble() {
-      bubble.classList.remove("show");
-      bubbleState.hideAt = 0;
-    }
-
-    // ---------- HUD ----------
-    function titlesUntil(threshold, all) {
-      for (let k = 1; all.watched + k <= all.total; k++) {
-        if (MP.percent(all.watched + k, all.total) >= threshold) return k;
-      }
-      return null;
-    }
-
-    function updateHud() {
-      if (hud.hidden) return;
-      const preview = debugPercent != null;
-      const all = MP.profile() ? MP.stats().all : { total: 0, watched: 0, percent: 0 };
-      const p = preview ? debugPercent : all.percent;
-      const st = stageFor(p);
-      hudRef.stage.textContent = st.name;
-      hudRef.step.textContent = "Stufe " + (st.index + 1) + "/" + STAGES.length;
-      hudPips.forEach((pip, i) => pip.classList.toggle("on", i <= st.index));
-      hudRef.percent.textContent = Math.round(p) + " %";
-      hudRef.fill.style.width = clamp(p, 0, 100) + "%";
-      hudBar.setAttribute("aria-valuenow", String(Math.round(p)));
-      hudRef.count.textContent = preview
-        ? "Vorschau mit fiktivem Fortschritt"
-        : all.watched + " von " + all.total + " Titeln gesehen";
-      if (st.index >= STAGES.length - 1) {
-        hudRef.next.textContent = "Maximale Stufe erreicht";
-      } else {
-        const nxt = STAGES[st.index + 1];
-        const n = preview ? null : titlesUntil(nxt.from, all);
-        hudRef.next.textContent = nxt.name + " ab " + nxt.from + " %" + (n != null ? " · noch " + n + " Titel" : "");
-      }
-    }
-
-    function openHud() {
-      if (!shown) return;
-      hud.hidden = false;
-      hit.setAttribute("aria-expanded", "true");
-      widget.classList.add("groot-hud-open");
-      updateHud();
-    }
-
-    function closeHud(focusBack) {
-      if (hud.hidden) return;
-      hud.hidden = true;
-      hit.setAttribute("aria-expanded", "false");
-      widget.classList.remove("groot-hud-open");
-      if (focusBack) hit.focus({ preventScroll: true });
-    }
-
-    hit.addEventListener("click", () => {
-      if (hud.hidden) {
-        openHud();
-        showBubble();
-        if (!reduce) startWave();
-        if (HUD && HUD.playClick) HUD.playClick();
-      } else {
-        closeHud();
-      }
-    });
-    hit.addEventListener("pointerenter", () => (hoverTarget = 1));
-    hit.addEventListener("pointerleave", () => (hoverTarget = 0));
-    hit.addEventListener("focus", () => (hoverTarget = 1));
-    hit.addEventListener("blur", () => (hoverTarget = 0));
-    hud.querySelector(".groot-hud-close").addEventListener("click", () => closeHud(true));
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !hud.hidden) closeHud(true);
-    });
-    document.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (hud.hidden) return;
-        if (hud.contains(e.target) || hit.contains(e.target)) return;
-        closeHud();
-      },
-      true
-    );
-
-    // ---------- Sichtbarkeit & Pausen ----------
-    const jarvisPanel = document.getElementById("jarvis-panel");
-    function computeShown() {
-      if (!MP.profile() && debugPercent == null) return false;
-      if (document.body.classList.contains("panel-open")) return false;
-      // Das J.A.R.V.I.S.-Chatfenster liegt ohnehin über Groot — dann ruht er.
-      if (jarvisPanel && !jarvisPanel.classList.contains("hidden")) return false;
-      return true;
-    }
-
-    function updateShown() {
-      const s = computeShown();
-      if (s === shown) return;
-      shown = s;
-      widget.classList.toggle("groot-shown", s);
-      widget.setAttribute("aria-hidden", s ? "false" : "true");
-      if (!s) {
-        closeHud();
-        hideBubble();
-      } else {
-        hitDirty = true;
-      }
-      updateRun();
-    }
-
-    function updateRun() {
-      const should = shown && !paused && !document.hidden;
-      if (should === running) return;
-      running = should;
-      if (running) {
-        lastFrame = performance.now();
-        rafId = requestAnimationFrame(loop);
-        if (pendingGrowth) {
-          const pg = pendingGrowth;
-          pendingGrowth = null;
-          startGrowth(pg.to, pg.celebrate && pg.to >= anim.g - 1e-6, 0.45);
-        }
-      } else {
-        cancelAnimationFrame(rafId);
-      }
-    }
-
-    const mo = new MutationObserver(updateShown);
-    mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    if (jarvisPanel) mo.observe(jarvisPanel, { attributes: true, attributeFilter: ["class"] });
-    document.addEventListener("visibilitychange", updateRun);
-
-    if (window.ResizeObserver) new ResizeObserver(resize).observe(widget);
-    window.addEventListener("resize", resize);
-
-    // ---------- Wachstum ----------
-    // Läuft Groot gerade nicht (z.B. hinter „Entdecken“ oder dem Film-Fenster,
-    // wo Titel meist markiert werden), wird die Animation nachgeholt, sobald er
-    // wieder sichtbar ist.
-    let pendingGrowth = null;
-    function growTo(g, mode) {
-      if (mode === "instant") {
-        pendingGrowth = null;
-        anim.active = false;
-        glow.t = -100;
-        setGrowth(g);
-        return;
-      }
-      const celebrate = mode === "celebrate";
-      if (!running) {
-        pendingGrowth = { to: g, celebrate: celebrate || Boolean(pendingGrowth && pendingGrowth.celebrate) };
-        return;
-      }
-      startGrowth(g, celebrate, 0);
-    }
-
-    function startGrowth(g, celebrate, extraDelay) {
-      anim.from = anim.g;
-      anim.to = g;
-      anim.t = 0;
-      anim.celebrate = celebrate && !reduce;
-      anim.delay = (anim.celebrate ? 0.3 : 0) + extraDelay;
-      anim.dur = reduce ? 0.35 : celebrate ? 2.1 : 1.2;
-      anim.active = true;
-      if (celebrate) {
-        glow.t = -extraDelay;
-        glow.dur = reduce ? 0.9 : 2.7;
-        if (!reduce) spawnEffects(extraDelay);
-      }
-    }
-
-    function spawnEffects(delay) {
-      const H = figureHeight(form);
-      particles.forEach((p, i) => {
-        const a = Math.random() * Math.PI * 2;
-        const rad = form.shoulderW * (0.4 + Math.random() * 0.9);
-        p.pos.set(Math.cos(a) * rad, H * (0.25 + Math.random() * 0.8), Math.sin(a) * rad * 0.6);
-        p.vel.set(Math.cos(a) * (0.25 + Math.random() * 0.4), 0.45 + Math.random() * 0.55, Math.sin(a) * 0.3 + 0.2);
-        p.axis.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        p.rot = Math.random() * 6;
-        p.spin = (Math.random() - 0.5) * 9;
-        p.size = 0.07 + Math.random() * 0.06;
-        p.life = 1.5 + Math.random() * 0.9;
-        p.age = -i * 0.03 - delay;
-      });
-      particleMesh.visible = true;
-      sparkData.forEach((s, i) => {
-        s.a = Math.random() * Math.PI * 2;
-        s.r = PLAT_R * (0.3 + Math.random() * 0.65);
-        s.y = 0;
-        s.v = 0.5 + Math.random() * 0.9;
-        s.delay = Math.random() * 0.9 + i * 0.005 + delay;
-      });
-      sparks.visible = true;
-    }
-
-    const _q = new THREE.Quaternion();
-    const _sc = new THREE.Vector3();
-    function updateEffects(dt) {
-      if (particleMesh.visible) {
-        let alive = 0;
-        particles.forEach((p, i) => {
-          p.age += dt;
-          let s = 0;
-          if (p.age > 0 && p.age < p.life) {
-            alive++;
-            p.vel.y -= 0.12 * dt;
-            p.vel.multiplyScalar(0.985);
-            p.pos.addScaledVector(p.vel, dt);
-            p.rot += p.spin * dt;
-            const k = p.age / p.life;
-            s = p.size * Math.sin(Math.PI * Math.min(1, k * 1.15)) ** 0.6;
-          } else if (p.age <= 0) {
-            alive++;
-          }
-          _q.setFromAxisAngle(p.axis, p.rot);
-          _m.compose(p.pos, _q, _sc.set(s + 1e-4, s + 1e-4, s + 1e-4));
-          particleMesh.setMatrixAt(i, _m);
-        });
-        particleMesh.instanceMatrix.needsUpdate = true;
-        if (!alive) particleMesh.visible = false;
-      }
-      if (sparks.visible) {
-        let alive = 0;
-        let fade = 0;
-        sparkData.forEach((s, i) => {
-          s.delay -= dt;
-          if (s.delay < 0) s.y += s.v * dt;
-          const yMax = figureHeight(form) * 1.05;
-          if (s.y < yMax) alive++;
-          sparkPos[i * 3] = Math.cos(s.a + s.y * 1.5) * s.r * (1 - s.y * 0.15);
-          sparkPos[i * 3 + 1] = s.delay < 0 && s.y < yMax ? s.y : -50;
-          sparkPos[i * 3 + 2] = Math.sin(s.a + s.y * 1.5) * s.r * (1 - s.y * 0.15);
-          fade = Math.max(fade, s.delay < 0 ? 1 - s.y / yMax : 0);
-        });
-        sparkGeo.attributes.position.needsUpdate = true;
-        sparkMat.color.setRGB(0.45, 1.0, 0.6).multiplyScalar(0.25 + 0.75 * clamp(fade, 0, 1));
-        if (!alive) sparks.visible = false;
-      }
-    }
-
-    function startWave() {
-      if (wave.t < 0) wave.t = 0;
-    }
-
-    // ---------- Synchronisierung mit MarvelProgress ----------
-    function targetGrowth() {
-      return growthFor(currentPercent());
-    }
-
-    function refreshFromProgress(mode) {
-      const pct = currentPercent();
-      platUniforms.uProgress.value = pct / 100;
-      widget.style.setProperty("--groot-p", String(pct));
-      growTo(targetGrowth(), mode);
-      updateHud();
-    }
-
-    let swapTimer = 0;
-    function swapProfile() {
-      // Profilwechsel: kurz ausblenden, neue Stufe setzen, wieder einblenden
-      clearTimeout(swapTimer);
-      if (!shown || reduce) {
-        refreshFromProgress("instant");
-        updateShown();
-        return;
-      }
-      widget.classList.add("groot-swap");
-      swapTimer = setTimeout(() => {
-        refreshFromProgress("instant");
-        widget.classList.remove("groot-swap");
-        updateShown();
-      }, 230);
-    }
-
-    MP.subscribe((ev) => {
-      if (ev.type === "watched") {
-        refreshFromProgress(ev.value ? "celebrate" : "shrink");
-      } else if (ev.type === "profile" || ev.type === "sync") {
-        if (!MP.profile()) {
-          updateShown();
-          refreshFromProgress("instant");
-        } else if (!shown) {
-          refreshFromProgress("instant");
-          updateShown();
-        } else {
-          swapProfile();
-        }
-      } else if (ev.type === "achievement" || ev.type === "universe-complete") {
-        if (!reduce && shown) startWave();
-      }
-    });
-
-    // =====================================================================
-    // Animation
-    // =====================================================================
-    function damp(cur, target, rate, dt) {
-      return lerp(cur, target, 1 - Math.exp(-rate * dt));
-    }
-
-    function animateIdle(dt) {
+    // Idle-/Winke-Pose aus dem neutralen Zustand der Komponente
+    function pose(s) {
       const P = form;
-      const t = clock;
+      const t = s.time;
+      const reduce = s.reduceMotion;
+      shared.uTime.value = t;
 
       // Atmen
-      const br = Math.sin(t * ((Math.PI * 2) / 3.8));
-      const breathAmp = reduce ? 0.0025 : 0.011;
-      spine.scale.set(1 + br * breathAmp * 0.8, 1 + br * breathAmp, 1 + br * breathAmp * 0.8);
-      shoulderLine.position.y = P.torsoH * 0.86 + br * breathAmp * P.torsoH * 0.6;
+      spine.scale.set(1 + s.breath * 0.8, 1 + s.breath, 1 + s.breath * 0.8);
+      shoulderLine.position.y = P.torsoH * 0.86 + s.breath * P.torsoH * 0.6;
 
-      // Grundhaltung: leicht zur Bildschirmmitte gedreht
-      const baseYaw = (compact ? compactSide : -1) * 0.24;
-      fig.rotation.y = baseYaw + (reduce ? 0 : Math.sin(t * 0.33) * 0.07);
+      fig.rotation.y = s.bodyYaw;
+      headPivot.rotation.set(s.pitch, s.yaw, s.roll);
 
-      // Kopf: gelegentlich umsehen, neigen; meist zum Betrachter
-      if (!reduce) {
-        look.next -= dt;
-        if (look.next <= 0) {
-          const toViewer = Math.random() < 0.45;
-          look.tYaw = toViewer ? -baseYaw * 0.6 : (Math.random() - 0.5) * 0.9;
-          look.tPitch = toViewer ? -0.04 : (Math.random() - 0.4) * 0.3;
-          look.tRoll = (Math.random() - 0.5) * (toViewer ? 0.32 : 0.2);
-          look.next = 1.8 + Math.random() * 3.4;
-        }
-      } else {
-        look.tYaw = look.tPitch = look.tRoll = 0;
-      }
-      let waveK = 0;
-      if (wave.t >= 0) {
-        wave.t += dt;
-        waveK = smoothstep(0, 0.45, wave.t) * (1 - smoothstep(wave.dur - 0.5, wave.dur, wave.t));
-        if (wave.t >= wave.dur) {
-          wave.t = -1;
-          wave.next = 16 + Math.random() * 16;
-        }
-      } else if (!reduce) {
-        wave.next -= dt;
-        if (wave.next <= 0) startWave();
-      }
-      look.yaw = damp(look.yaw, lerp(look.tYaw, -baseYaw * 0.5, waveK), 3.2, dt);
-      look.pitch = damp(look.pitch, lerp(look.tPitch, -0.06, waveK), 3.2, dt);
-      look.roll = damp(look.roll, lerp(look.tRoll, 0.12, waveK), 3.2, dt);
-      headPivot.rotation.set(look.pitch, look.yaw, look.roll);
-
-      // Arme: leichtes Pendeln; der zur Bildmitte zeigende Arm winkt gelegentlich
-      const waveSide = compact ? compactSide : -1;
+      // Arme: leichtes Pendeln; der Arm auf s.waveSide winkt
       arms.forEach((arm, i) => {
-        const s = arm.side;
+        const side = arm.side;
         const sway = reduce ? 0 : Math.sin(t * 0.9 + i * 1.7) * 0.045;
-        let rz = s * (P.splay + sway);
+        let rz = side * (P.splay + sway);
         let rx = -0.1 + (reduce ? 0 : Math.sin(t * 0.7 + i) * 0.04);
         let ez = 0;
         let ex = P.elbow + (reduce ? 0 : Math.sin(t * 0.8 + i * 2.1) * 0.05);
-        if (s === waveSide && waveK > 0) {
-          const osc = Math.sin(wave.t * 13.0);
+        const waveK = s.wave;
+        if (side === s.waveSide && waveK > 0) {
+          const osc = Math.sin(s.waveTime * 13.0);
           // Großer Groot: Oberarm unten lassen und den Unterarm vorn hochklappen —
           // sonst ragt die Hand im festen Desktop-Ausschnitt über den Canvas-Rand.
-          const big = compact ? 0 : smoothstep(1.0, 2.5, anim.g);
-          rz = lerp(rz, s * lerp(2.55, 0.3, big), waveK);
+          const big = s.compact ? 0 : smoothstep(1.0, 2.5, growth);
+          rz = lerp(rz, side * lerp(2.55, 0.3, big), waveK);
           rx = lerp(rx, -0.25, waveK);
-          ez = lerp(0, s * (lerp(0.55, 0.2, big) + osc * lerp(0.4, 0.3, big)), waveK);
+          ez = lerp(0, side * (lerp(0.55, 0.2, big) + osc * lerp(0.4, 0.3, big)), waveK);
           ex = lerp(ex, lerp(-0.15, -2.4, big), waveK);
         }
         arm.armRoot.rotation.set(rx, 0, rz);
         arm.elbow.rotation.set(ex, 0, ez);
       });
 
-      // Blinzeln (gelegentlich doppelt)
-      blink.next -= dt;
-      if (blink.t < 0 && blink.next <= 0) blink.t = 0;
-      let closed = 0;
-      if (blink.t >= 0) {
-        blink.t += dt;
-        const d = 0.17;
-        closed = Math.sin(Math.PI * clamp(blink.t / d, 0, 1));
-        if (blink.t >= d) {
-          blink.t = -1;
-          blink.second = !blink.second && Math.random() < 0.2;
-          blink.next = blink.second ? 0.12 : (reduce ? 4 : 2.2) + Math.random() * 3.6;
-        }
-      }
+      // Lider (Blinzeln)
       eyes.forEach((eye) => {
-        eye.lid.rotation.x = lerp(P.lid, 1.62, closed);
-        const showGlint = closed < 0.45;
+        eye.lid.rotation.x = lerp(P.lid, 1.62, s.blink);
+        const showGlint = s.blink < 0.45;
         eye.glints[0].visible = eye.glints[1].visible = showGlint;
       });
 
-      // Plattform
       shared.uFlutter.value = reduce ? 0.2 : 1;
-    }
-
-    function update(dt) {
-      clock += dt;
-      shared.uTime.value = clock;
-      platUniforms.uTime.value = reduce ? 0 : clock;
-
-      if (anim.active) {
-        anim.t += dt;
-        const k = clamp((anim.t - anim.delay) / anim.dur, 0, 1);
-        const e = anim.celebrate ? easeOutBack(k) : easeInOut(k);
-        setGrowth(lerp(anim.from, anim.to, e));
-        if (k >= 1) {
-          anim.active = false;
-          setGrowth(anim.to);
-          if (anim.celebrate) showBubble(2600);
-        }
-      }
-
-      let glowV = 0;
-      if (glow.t > -10) {
-        glow.t += dt;
-        glowV = smoothstep(0, 0.35, glow.t) * (1 - smoothstep(glow.dur - 1.0, glow.dur, glow.t));
-        glowV *= 0.85 + 0.15 * Math.sin(glow.t * 14);
-        if (glow.t >= glow.dur) glow.t = -100;
-      }
-      shared.uGlow.value = glowV;
-      platUniforms.uPulse.value = glowV;
-      platLight.color.setHex(glowV > 0.05 ? 0x5dffa0 : 0x46d8ff);
-      platLight.intensity = 1.1 + glowV * 1.5;
-
-      hover = damp(hover, hoverTarget, 8, dt);
-      platUniforms.uHover.value = hover;
-
-      animateIdle(dt);
-      updateEffects(dt);
       updateLeaves();
-
-      // Sprechblase: selten von selbst, sonst nach Klick/Wachstum
-      if (bubbleState.hideAt && clock >= bubbleState.hideAt) hideBubble();
-      bubbleState.next -= dt;
-      if (bubbleState.next <= 0) {
-        bubbleState.next = 40 + Math.random() * 50;
-        showBubble();
-      }
     }
 
-    let frameCount = 0;
-    function renderOnce() {
-      updateLeaves();
-      if (hitDirty) updateHitArea();
-      renderer.render(scene, camera);
-    }
-
-    function loop(now) {
-      if (!running) return;
-      rafId = requestAnimationFrame(loop);
-      const elapsed = now - lastFrame;
-      if (elapsed < 1000 / 30 - 3) return; // ~30 fps genügen für die kleine Figur
-      lastFrame = now;
-      update(Math.min(0.1, elapsed / 1000));
-      frameCount++;
-      if (hitDirty && (frameCount % 6 === 0 || !anim.active)) updateHitArea();
-      renderer.render(scene, camera);
-    }
-
-    // ---------- Öffentliche API ----------
-    api.setPaused = (v) => {
-      paused = Boolean(v);
-      updateRun();
+    return {
+      object: root,
+      credit: "Stilisierter 3D-Platzhalter – kein offizielles Marvel-Modell",
+      setGrowth(g) {
+        growth = g;
+        applyForm(formAt(g));
+        updateLeaves();
+      },
+      height: () => figureHeight(form),
+      head: () => ({ y: form.hip + form.torsoH * 0.93 + form.neckH + form.headH * 0.5, size: form.headH }),
+      headTop(v) {
+        fig.updateMatrixWorld(true);
+        return headPivot.localToWorld(v.set(0, form.headH * 0.9, 0));
+      },
+      // Nur die Figur — die Blatt-Instanzen (eigenes Mesh) zählen nicht mit
+      bounds(box) {
+        fig.updateMatrixWorld(true);
+        return box.setFromObject(fig);
+      },
+      pose,
+      setGlow(v) {
+        shared.uGlow.value = v;
+      },
+      emitters() {
+        const H = figureHeight(form);
+        return { radius: form.shoulderW, y0: H * 0.25, y1: H * 1.05 };
+      },
+      triangles() {
+        let n = 0;
+        root.traverseVisible((o) => {
+          if (!o.isMesh) return;
+          const g = o.geometry;
+          n += ((g.index ? g.index.count : g.attributes.position.count) / 3) * (o.isInstancedMesh ? o.count : 1);
+        });
+        return Math.round(n);
+      },
+      dispose() {
+        const seen = new Set();
+        root.traverse((o) => {
+          if (o.geometry) seen.add(o.geometry);
+          if (o.material) seen.add(o.material);
+        });
+        seen.forEach((x) => x.dispose());
+        leafTex.dispose();
+        eyeMat.map.dispose();
+        if (root.parent) root.parent.remove(root);
+      },
     };
-    api.refresh = () => {
-      refreshFromProgress("instant");
-      updateShown();
-    };
-    api.debugSetPercent = (p) => {
-      debugPercent = p == null || p === "" ? null : clamp(Number(p) || 0, 0, 100);
-      refreshFromProgress("instant");
-      updateShown();
-      if (shown) renderOnce();
-    };
-    api.debugInfo = () => {
-      fig.updateMatrixWorld(true);
-      _box.setFromObject(fig);
-      return {
-        percent: currentPercent(),
-        stage: stageFor(currentPercent()),
-        growth: anim.g,
-        target: targetGrowth(),
-        animating: anim.active,
-        glow: shared.uGlow.value,
-        effects: particleMesh.visible || sparks.visible,
-        height: _box.max.y - _box.min.y,
-        // Körpergröße laut Proportionen (ohne Idle-Bewegung wie erhobene Arme)
-        size: figureHeight(form),
-        headRatio: form.headH / figureHeight(form),
-        triangles: renderer.info.render.triangles,
-        waving: wave.t >= 0,
-        headTurn: Math.abs(headPivot.rotation.x) + Math.abs(headPivot.rotation.y) + Math.abs(headPivot.rotation.z),
-        shown,
-        running,
-        compact,
-        paused,
-      };
-    };
-
-    // ---------- Start ----------
-    resize();
-    refreshFromProgress("instant");
-    // Alle Shader vorab übersetzen — auch die der (noch unsichtbaren) Effekte,
-    // sonst stockt die erste Wachstumsanimation.
-    const hiddenForCompile = [particleMesh, sparks, platform].filter((o) => !o.visible);
-    hiddenForCompile.forEach((o) => (o.visible = true));
-    renderer.compile(scene, camera);
-    hiddenForCompile.forEach((o) => (o.visible = false));
-    updateShown();
-    if (shown) renderOnce();
   }
 })();
