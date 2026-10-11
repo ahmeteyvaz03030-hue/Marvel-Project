@@ -865,8 +865,8 @@ window.MarvelProgressUI = (function () {
         "🌌",
         "Universen abgeschlossen",
         s.universesCompleted + "<small> / " + s.universesTotal + "</small>",
-        barHTML(P.percent(s.universesCompleted, s.universesTotal), s.universesTotal > 0 && s.universesCompleted >= s.universesTotal) +
-          (s.universesUpcoming ? '<span class="pd-tile-foot">+' + s.universesUpcoming + " demnächst</span>" : "")
+        (s.universesUpcoming ? '<span class="pd-tile-foot">+' + s.universesUpcoming + " demnächst</span>" : "") +
+          barHTML(P.percent(s.universesCompleted, s.universesTotal), s.universesTotal > 0 && s.universesCompleted >= s.universesTotal)
       ) +
       tileHTML(
         "🏆",
