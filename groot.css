@@ -333,9 +333,12 @@ body.panel-open #groot-widget {
 
 /* ---------- Smartphone quer: kompakt links neben dem J.A.R.V.I.S.-Button ---------- */
 @media (max-height: 480px) and (orientation: landscape) {
+  /* top: auto — kleine Querformat-Phones (≤ 640 px breit) erfüllen auch die
+     Hochkant-Regel oben, deren top-Wert hier nicht gelten darf */
   #groot-widget {
     left: auto;
     right: 78px;
+    top: auto;
     bottom: 55px;
     width: 52px;
     height: 52px;
@@ -363,6 +366,7 @@ body.panel-open #groot-widget {
   .groot-bubble {
     left: auto;
     right: 0;
+    top: auto;
     bottom: calc(100% + 8px);
     border-radius: 14px 14px 4px 14px;
     transform-origin: 100% 100%;
@@ -373,6 +377,7 @@ body.panel-open #groot-widget {
   .groot-hud {
     left: auto;
     right: calc(100% + 10px);
+    top: auto;
     bottom: 0;
     width: min(270px, calc(100vw - 120px));
     max-height: calc(100vh - 115px);
