@@ -176,6 +176,7 @@
     "secret-overlay",
     "stats-overlay",
     "profile-dashboard",
+    "charlab-overlay",
   ];
 
   let renderPaused = false;
@@ -5172,6 +5173,9 @@
       "Keine Zugehörigkeiten hinterlegt."
     );
     renderVariantCards(document.getElementById("character-variants"), c, universe, relations.variants);
+
+    // J.A.R.V.I.S. Character Lab (charlab.js): Button nur bei vorhandenem 3D-Modell
+    if (window.MarvelCharLab) MarvelCharLab.bindProfile(c, universe);
 
     openOverlay(modal);
   }
