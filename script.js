@@ -3879,98 +3879,663 @@
     return { update, refresh };
   })();
 
-  // ---------- Doctor Doom (stilisierte Wächter-Figur) ----------
-  // Kein echtes Schauspielerfoto (Urheber-/Persönlichkeitsrechte) — stattdessen eine
-  // bewusst erwachsen und bedrohlich wirkende, hochaufgelöste Metall-Silhouette.
+  // ---------- Doctor Doom (prozedurale Wächter-Figur) ----------
+  // Kein echtes Schauspielerfoto und kein fremdes 3D-Modell (Urheber-/Lizenzrechte) —
+  // die Figur wird vollständig prozedural modelliert: polierte Silbermaske,
+  // dunkelgrüne Kapuze mit langem Umhang, Metallrüstung und dezente grüne Energie.
+  // Modellmaße in Kopfhöhen (Fußsohle y = 0, Scheitel ≈ 7,8): natürliche, erwachsene
+  // Proportionen mit breiten Schultern und schmaler Taille.
   function createDoomFigure() {
     const group = new THREE.Group();
+    const body = new THREE.Group();
+    body.position.y = -4; // Dreh- und Schwebepunkt etwa auf halber Höhe (Gürtel)
+    group.add(body);
 
-    // Bodenlanger Umhang — breite Basis, schmale Schultern für eine hochgewachsene Silhouette
-    const cloakMat = new THREE.MeshStandardMaterial({
-      color: 0x0d3320,
-      roughness: 0.82,
-      metalness: 0.18,
-      flatShading: true,
-      side: THREE.DoubleSide,
+    // Schwache Geräte: weniger Segmente — die Figur ist ohnehin klein im Bild.
+    const detail = LOW_TIER ? 0.6 : 1;
+    const seg = (n) => Math.max(6, Math.round(n * detail));
+    const sstep = (a, b, x) => {
+      const k = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return k * k * (3 - 2 * k);
+    };
+    const gauss = (d, w) => Math.exp(-(d * d) / (w * w));
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+    // Gemeinsame Zeit für Umhang-Schwung und Energie-Partikel (Shader-Uniform)
+    const doomTime = { value: 0 };
+
+    // Kleine prozedurale Studio-Umgebung nur für die Doom-Materialien: ohne
+    // Spiegelbild wirkt Metall in dieser Szene (kein scene.environment) stumpf.
+    function makeEnvironment() {
+      const w = LOW_TIER ? 128 : 256;
+      const h = w / 2;
+      const cv = document.createElement("canvas");
+      cv.width = w;
+      cv.height = h;
+      const g = cv.getContext("2d");
+      const sky = g.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, "#4a5464");
+      sky.addColorStop(0.38, "#8794a5");
+      sky.addColorStop(0.48, "#d3dae4");
+      sky.addColorStop(0.53, "#6a717b");
+      sky.addColorStop(0.64, "#2e333a");
+      sky.addColorStop(0.85, "#151a18");
+      sky.addColorStop(1, "#0c1a10");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = "lighter";
+      // Weiche Lichtflächen: u = Himmelsrichtung (≈ 0,69 liegt Richtung Kamera), v = Höhe
+      const blob = (u, v, rx, ry, rgb, a) => {
+        g.save();
+        g.translate(u * w, (1 - v) * h);
+        g.scale(rx * w, ry * h);
+        const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gr.addColorStop(0, `rgba(${rgb},${a})`);
+        gr.addColorStop(0.55, `rgba(${rgb},${a * 0.6})`);
+        gr.addColorStop(1, `rgba(${rgb},0)`);
+        g.fillStyle = gr;
+        g.beginPath();
+        g.arc(0, 0, 1, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      };
+      blob(0.86, 0.72, 0.09, 0.17, "235,242,255", 1); // Hauptlicht oben links
+      blob(0.7, 0.62, 0.13, 0.07, "205,214,228", 0.7); // frontale Aufhellung
+      blob(0.12, 0.6, 0.045, 0.28, "160,185,255", 0.9); // kühles Kantenlicht links hinten
+      blob(0.37, 0.58, 0.045, 0.26, "255,205,160", 0.75); // warmes Kantenlicht rechts hinten
+      blob(0.6, 0.47, 0.08, 0.08, "255,160,90", 0.55); // Widerschein des Energiekerns
+      blob(0.72, 0.18, 0.3, 0.14, "40,170,90", 0.45); // grüner Schimmer von unten
+      const tex = new THREE.CanvasTexture(cv);
+      tex.minFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const target = pmrem.fromEquirectangular(tex);
+      pmrem.dispose();
+      tex.dispose();
+      return target.texture;
+    }
+    const envMap = makeEnvironment();
+
+    // Materialien: polierte Silbermaske, gebürsteter Stahl, dunkles Metall und
+    // dunkelgrüner Stoff — glatt schattiert, Spiegelungen aus der Studio-Umgebung.
+    const std = (o) => new THREE.MeshStandardMaterial(Object.assign({ envMap }, o));
+    const maskMat = std({ color: 0xd8dfe7, metalness: 1, roughness: 0.24, envMapIntensity: 1.4 });
+    const armorMat = std({ color: 0x737c87, metalness: 1, roughness: 0.48, envMapIntensity: 1.2, side: THREE.DoubleSide });
+    const darkMat = std({ color: 0x1c2025, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.7 });
+    const clothMat = std({ color: 0x0c3d1f, metalness: 0, roughness: 0.86, envMapIntensity: 0.45, side: THREE.DoubleSide });
+    const capeMat = std({ color: 0x0a351b, metalness: 0, roughness: 0.88, envMapIntensity: 0.45, side: THREE.DoubleSide });
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xa8ffc0, fog: false });
+
+    // Gemeinsamer Shader-Zusatz (nur Werte per Uniform, damit alle Doom-Materialien
+    // dasselbe Programm teilen können):
+    // - uDirect dämpft das direkte Licht des Energiekerns, das die weit entfernte
+    //   Figur sonst grell überstrahlt (Planeten und übrige Szene bleiben unberührt)
+    // - Stoff: Innenseiten liegen im Schatten (uBack), ein feiner grüner Saum (uRim)
+    //   trennt den dunklen Stoff vom Weltraum
+    // - Umhang: langsamer Schwung im Vertex-Shader (uSway), kein Neuaufbau pro Frame
+    function patchMaterial(mat, o) {
+      const uniforms = {
+        uDoomTime: doomTime,
+        uDirect: { value: o.direct },
+        uBack: { value: o.back || 1 },
+        uRim: { value: new THREE.Color(o.rim || 0) },
+        uSway: { value: o.sway || 0 },
+      };
+      mat.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader =
+          "uniform float uDoomTime;\nuniform float uSway;\n" +
+          shader.vertexShader.replace(
+            "#include <begin_vertex>",
+            `#include <begin_vertex>
+            float sw = uSway * clamp((6.4 - position.y) / 6.3, 0.0, 1.0);
+            sw *= sw;
+            transformed.x += sw * (sin(uDoomTime * 0.55 + position.y * 0.8) * 0.07 + sin(uDoomTime * 0.9 + position.x * 2.1) * 0.025);
+            transformed.z += sw * (sin(uDoomTime * 0.43 + position.x * 1.4 + position.y * 0.6) * 0.1 - 0.03);`
+          );
+        shader.fragmentShader =
+          "uniform vec3 uRim;\nuniform float uDirect;\nuniform float uBack;\n" +
+          shader.fragmentShader
+            .replace("#include <color_fragment>", "#include <color_fragment>\n diffuseColor.rgb *= gl_FrontFacing ? 1.0 : uBack;")
+            .replace(
+              "#include <emissivemap_fragment>",
+              `#include <emissivemap_fragment>
+              float rimF = 1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0);
+              totalEmissiveRadiance += uRim * rimF * rimF * rimF;`
+            )
+            .replace(
+              "#include <lights_fragment_end>",
+              "#include <lights_fragment_end>\n reflectedLight.directDiffuse *= uDirect;\n reflectedLight.directSpecular *= uDirect;"
+            );
+      };
+    }
+    patchMaterial(maskMat, { direct: 0.55 });
+    patchMaterial(armorMat, { direct: 0.5 });
+    patchMaterial(darkMat, { direct: 0.5 });
+    patchMaterial(clothMat, { direct: 0.38, back: 0.38, rim: 0x0a3519 });
+    patchMaterial(capeMat, { direct: 0.38, back: 0.38, rim: 0x0a3519, sway: 1 });
+
+    // ---- Geometrie-Helfer ----
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _e = new THREE.Euler();
+    const _p = new THREE.Vector3();
+    const _s = new THREE.Vector3();
+    const _up = new THREE.Vector3(0, 1, 0);
+
+    // Position, Drehung (Euler) und Skalierung direkt in die Geometrie übernehmen
+    function place(geo, px, py, pz, rx, ry, rz, sx, sy, sz) {
+      _e.set(rx || 0, ry || 0, rz || 0);
+      _q.setFromEuler(_e);
+      _s.set(sx || 1, sy || sx || 1, sz || sx || 1);
+      return geo.applyMatrix4(_m.compose(_p.set(px, py, pz), _q, _s));
+    }
+
+    // Glatter Körperteil entlang a → b mit Radienprofil [[t, r], …] (Drehkörper)
+    function limb(a, b, profile) {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const len = dir.length();
+      const geo = new THREE.LatheGeometry(profile.map(([t, r]) => new THREE.Vector2(r, t * len)), seg(14));
+      _q.setFromUnitVectors(_up, dir.normalize());
+      return geo.applyMatrix4(_m.compose(a, _q, _s.set(1, 1, 1)));
+    }
+
+    // Drehkörper um die Hochachse aus [[Radius, y], …]; flatZ staucht ihn zur Ellipse
+    function lathe(points, segments, flatZ) {
+      const geo = new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), seg(segments));
+      if (flatZ) geo.scale(1, 1, flatZ);
+      return geo;
+    }
+
+    // Normalen an deckungsgleichen Nahtpunkten (Kugelnaht, Pole) angleichen
+    function smoothNormals(geo) {
+      geo.computeVertexNormals();
+      const p = geo.attributes.position;
+      const n = geo.attributes.normal;
+      const shared = new Map();
+      for (let i = 0; i < p.count; i++) {
+        const key = `${Math.round(p.getX(i) * 1e4)},${Math.round(p.getY(i) * 1e4)},${Math.round(p.getZ(i) * 1e4)}`;
+        const list = shared.get(key);
+        if (list) list.push(i);
+        else shared.set(key, [i]);
+      }
+      shared.forEach((list) => {
+        if (list.length < 2) return;
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        list.forEach((i) => {
+          x += n.getX(i);
+          y += n.getY(i);
+          z += n.getZ(i);
+        });
+        const l = Math.hypot(x, y, z) || 1;
+        list.forEach((i) => n.setXYZ(i, x / l, y / l, z / l));
+      });
+      return geo;
+    }
+
+    // Fügt mehrere Teile zu einer Geometrie zusammen — ein Draw-Call pro Material
+    function merge(list) {
+      let vCount = 0;
+      let iCount = 0;
+      list.forEach((g) => {
+        vCount += g.attributes.position.count;
+        iCount += g.index ? g.index.count : g.attributes.position.count;
+      });
+      const pos = new Float32Array(vCount * 3);
+      const nor = new Float32Array(vCount * 3);
+      const uv = new Float32Array(vCount * 2);
+      const idx = vCount > 65535 ? new Uint32Array(iCount) : new Uint16Array(iCount);
+      let vo = 0;
+      let io = 0;
+      list.forEach((g) => {
+        const count = g.attributes.position.count;
+        pos.set(g.attributes.position.array, vo * 3);
+        nor.set(g.attributes.normal.array, vo * 3);
+        if (g.attributes.uv) uv.set(g.attributes.uv.array, vo * 2);
+        if (g.index) for (let i = 0; i < g.index.count; i++) idx[io++] = g.index.array[i] + vo;
+        else for (let i = 0; i < count; i++) idx[io++] = i + vo;
+        vo += count;
+        g.dispose();
+      });
+      const out = new THREE.BufferGeometry();
+      out.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      out.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+      out.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      out.setIndex(new THREE.BufferAttribute(idx, 1));
+      out.computeBoundingSphere();
+      return out;
+    }
+
+    // Fläche aus einem Raster (rows × cols) mit Positionsfunktion fn(u, v)
+    function gridSurface(rows, cols, fn) {
+      const pos = new Float32Array((rows + 1) * (cols + 1) * 3);
+      const uv = new Float32Array((rows + 1) * (cols + 1) * 2);
+      const idx = [];
+      const out = new THREE.Vector3();
+      for (let i = 0; i <= rows; i++) {
+        for (let j = 0; j <= cols; j++) {
+          const k = i * (cols + 1) + j;
+          fn(j / cols, i / rows, out);
+          pos[k * 3] = out.x;
+          pos[k * 3 + 1] = out.y;
+          pos[k * 3 + 2] = out.z;
+          uv[k * 2] = j / cols;
+          uv[k * 2 + 1] = i / rows;
+        }
+      }
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          const a = i * (cols + 1) + j;
+          const b = a + cols + 1;
+          idx.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      return smoothNormals(geo);
+    }
+
+    const maskParts = [];
+    const armorParts = [];
+    const darkParts = [];
+    const clothParts = [];
+    const glowParts = [];
+
+    // ---- Maske: verformte Kugel mit flacher Gesichtsplatte, kantigen Brauen,
+    // Nasengrat, Wangenknochen, Mundschlitz, eckigem Kinn und Plattennaht ----
+    const HEAD = V(0, 7.28, 0.05);
+    const seamX = (y) => 0.255 - 0.08 * sstep(-0.05, -0.42, y);
+    function shapeMask(v) {
+      let x = v.x * 0.35;
+      let y = v.y * 0.49;
+      let z = v.z * 0.43;
+      // Schädel oben etwas breiter, Kiefer zum eckigen Kinn hin schmaler
+      const jaw = sstep(0.02, -0.46, y);
+      x *= 1.02 - 0.3 * jaw;
+      if (z < 0) z *= 1 - 0.18 * jaw;
+      if (y < -0.41) y = -0.41 + (y + 0.41) * 0.3; // flacher Kinnboden
+      // Gesichtsplatte: Vorderseite weitgehend flach, nur leicht gewölbt
+      const front = sstep(0.05, 0.3, z);
+      const plate = 0.355 - 0.75 * x * x - 0.25 * Math.max(0, y - 0.18) ** 2;
+      if (z > plate) z = plate + (z - plate) * 0.18;
+      const ax = Math.abs(x);
+      let dz = 0;
+      // Brauenwulst, zur Mitte hin abgesenkt (strenger, finsterer Blick)
+      dz += 0.055 * gauss(y - (0.085 + 0.13 * ax), 0.03) * sstep(0.31, 0.2, ax);
+      // Augenhöhlen unter den Brauen
+      dz -= 0.04 * gauss(ax - 0.13, 0.075) * gauss(y - 0.015, 0.035);
+      // Nasengrat, nach unten breiter und höher
+      const nt = sstep(0.06, -0.16, y);
+      dz += (0.02 + 0.055 * nt) * gauss(x, 0.022 + 0.035 * nt) * sstep(-0.21, -0.165, y) * sstep(0.12, 0.04, y);
+      // Wangenknochen und eingefallene Wangen
+      dz += 0.025 * gauss(ax - 0.17, 0.06) * gauss(y + 0.08, 0.05);
+      dz -= 0.02 * gauss(ax - 0.15, 0.06) * gauss(y + 0.24, 0.06);
+      // Mundschlitz
+      dz -= 0.04 * sstep(0.15, 0.115, ax) * sstep(0.03, 0.016, Math.abs(y + 0.3));
+      // Kinn
+      dz += 0.022 * gauss(x, 0.09) * gauss(y + 0.4, 0.05);
+      // Plattennaht an Wangen und Kiefer
+      dz -= 0.012 * gauss(ax - seamX(y), 0.01) * sstep(0.1, 0.0, y);
+      v.set(x, y, z + dz * front);
+    }
+    const maskGeo = new THREE.SphereGeometry(1, seg(64), seg(56));
+    maskGeo.rotateY(-Math.PI / 2); // Naht nach hinten (unter die Kapuze)
+    {
+      const p = maskGeo.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < p.count; i++) {
+        shapeMask(v.fromBufferAttribute(p, i));
+        p.setXYZ(i, v.x, v.y, v.z);
+      }
+      smoothNormals(maskGeo);
+    }
+    // Oberfläche der Maske abtasten, um Details exakt aufzusetzen
+    const maskProbe = new THREE.Mesh(maskGeo, maskMat);
+    const probe = new THREE.Raycaster();
+    const probeDir = V(0, 0, -1);
+    const surfaceZ = (x, y) => {
+      probe.set(_p.set(x, y, 2), probeDir);
+      const hit = probe.intersectObject(maskProbe)[0];
+      return hit ? hit.point.z : 0.3;
+    };
+    // Schmale, schräg gestellte Augenschlitze (innen tiefer — bedrohlicher Blick)
+    [-1, 1].forEach((s) => {
+      const x = s * 0.128;
+      const eye = new THREE.BoxGeometry(0.125, 0.026, 0.03);
+      place(eye, x, 0.02, surfaceZ(x, 0.02) - 0.006, 0, 0, s * 0.2);
+      glowParts.push(eye);
     });
-    const cloak = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 2.5, 5.6, 10, 1, true), cloakMat);
-    cloak.position.y = -1.7;
-    group.add(cloak);
-
-    // Schulterpanzer — sorgt für eine breite, erwachsene Statur statt rundlicher Proportionen
-    const armorMat = new THREE.MeshStandardMaterial({
-      color: 0x2b2e33,
-      roughness: 0.32,
-      metalness: 0.9,
-      flatShading: true,
+    // Mundgitter: dunkle Öffnung mit senkrechten Stäben
+    const mouthZ = surfaceZ(0, -0.3);
+    darkParts.push(place(new THREE.BoxGeometry(0.25, 0.036, 0.012), 0, -0.3, mouthZ + 0.002));
+    for (let i = -2; i <= 2; i++) {
+      const x = i * 0.042;
+      maskParts.push(place(new THREE.BoxGeometry(0.011, 0.046, 0.022), x, -0.3, surfaceZ(x, -0.272) - 0.008));
+    }
+    // Nieten entlang der Wangen- und Kiefernaht
+    [-1, 1].forEach((s) => {
+      [0.02, -0.09, -0.2, -0.31].forEach((y) => {
+        const x = s * (seamX(y) + 0.024);
+        maskParts.push(place(new THREE.SphereGeometry(0.013, 6, 4), x, y, surfaceZ(x, y) - 0.002));
+      });
     });
-    const shoulderGeo = new THREE.BoxGeometry(1.15, 0.5, 0.9);
-    const shoulderL = new THREE.Mesh(shoulderGeo, armorMat);
-    shoulderL.position.set(-1.2, 0.75, 0.1);
-    shoulderL.rotation.z = 0.18;
-    const shoulderR = shoulderL.clone();
-    shoulderR.position.x = 1.2;
-    shoulderR.rotation.z = -0.18;
-    group.add(shoulderL, shoulderR);
+    maskParts.push(maskGeo);
+    [maskParts, darkParts, glowParts].forEach((list) => list.forEach((g) => g.translate(HEAD.x, HEAD.y, HEAD.z)));
 
-    // Metallkragen am Hals
-    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.15, 8, 20), armorMat);
-    collar.position.y = 0.62;
-    collar.rotation.x = Math.PI / 2;
-    group.add(collar);
+    // ---- Kapuze und Kragen als eine durchgehende Stofffläche: Profil (Radius
+    // über Höhe), vorne offen; die Öffnung schließt sich über der Stirn ----
+    const hoodProfile = new THREE.SplineCurve(
+      [
+        [1.08, 6.2], [1.0, 6.36], [0.82, 6.55], [0.62, 6.72], [0.555, 6.9], [0.545, 7.15],
+        [0.535, 7.4], [0.5, 7.65], [0.42, 7.85], [0.22, 7.98], [0.0, 8.02],
+      ].map(([r, y]) => new THREE.Vector2(r, y))
+    );
+    const hoodRows = seg(30);
+    const hoodPts = hoodProfile.getSpacedPoints(hoodRows);
+    const hoodGap = (y) => (0.3 + 0.38 * sstep(6.75, 7.1, y)) * (1 - sstep(7.45, 7.72, y));
+    function hoodPoint(u, vRow, out) {
+      const pr = hoodPts[Math.round(vRow * hoodRows)];
+      const y = pr.y;
+      const head = sstep(6.45, 6.95, y);
+      const sx = 1 + 0.02 * head;
+      const sz = 0.62 + 0.38 * head;
+      const g = hoodGap(y);
+      const a = g + (Math.PI * 2 - 2 * g) * u;
+      // Falten: weich fallender Kragen auf den Schultern, kaum Falten am Kopf
+      let r = pr.x;
+      r += 0.045 * Math.sin(a * 6 + 0.5) * sstep(6.95, 6.3, y) * sstep(0.02, 0.2, Math.min(u, 1 - u));
+      r += 0.012 * Math.sin(a * 9 + y * 4) * head;
+      // Leicht gerollter Saum an der Gesichtsöffnung
+      r += 0.02 * Math.max(0, 1 - Math.min(u, 1 - u) / 0.05);
+      // Kragen fällt vorne auf die Brust und hinten auf den Rücken
+      const drape = sstep(6.7, 6.2, y);
+      const ca = Math.cos(a);
+      r += 0.06 * drape;
+      out.set(Math.sin(a) * r * sx, y - drape * (0.3 * Math.pow(Math.max(0, ca), 1.5) + 0.12 * Math.max(0, -ca)), ca * r * sz + 0.02);
+      // Spitz zulaufende Kapuze am Hinterkopf
+      out.z -= 0.14 * sstep(7.45, 7.95, y) * Math.max(0, -Math.cos(a));
+    }
+    const hoodGeo = gridSurface(hoodRows, seg(40), hoodPoint);
+    clothParts.push(hoodGeo);
+    // Saum der Kapuzenöffnung als weicher Wulst
+    {
+      const left = [];
+      const right = [];
+      const tmp = new THREE.Vector3();
+      for (let i = 0; i <= hoodRows; i++) {
+        if (hoodGap(hoodPts[i].y) < 0.001) break;
+        hoodPoint(0, i / hoodRows, tmp);
+        left.push(tmp.clone());
+        hoodPoint(1, i / hoodRows, tmp);
+        right.push(tmp.clone());
+      }
+      const top = left[left.length - 1].clone().add(right[right.length - 1]).multiplyScalar(0.5);
+      const curve = new THREE.CatmullRomCurve3(left.concat([top], right.reverse()));
+      clothParts.push(new THREE.TubeGeometry(curve, seg(64), 0.03, 6, false));
+    }
 
-    // Metallmaske — glatt schattiert für einen polierten, realistischeren Metalleindruck
-    const maskMat = new THREE.MeshStandardMaterial({
-      color: 0x6d7178,
-      roughness: 0.2,
-      metalness: 1,
-      flatShading: false,
-      emissive: 0x14150f,
-      emissiveIntensity: 0.25,
+    // Zwei runde Mantelschließen an der Kragenöffnung
+    [0, 1].forEach((u) => {
+      const c = new THREE.Vector3();
+      hoodPoint(u, 0.12, c);
+      maskParts.push(place(new THREE.CylinderGeometry(0.075, 0.075, 0.035, seg(18)), c.x * 0.97, c.y, c.z + 0.02, Math.PI / 2));
+      maskParts.push(place(new THREE.TorusGeometry(0.075, 0.016, 6, seg(18)), c.x * 0.97, c.y, c.z + 0.038));
     });
-    const mask = new THREE.Mesh(new THREE.IcosahedronGeometry(1.05, 2), maskMat);
-    mask.scale.set(0.94, 1.18, 0.92);
-    mask.position.set(0, 1.55, 0.5);
-    group.add(mask);
 
-    // Kantige Stirn-/Augenbrauenpartie für einen strengeren, weniger rundlichen Ausdruck
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.26, 0.55), armorMat);
-    brow.position.set(0, 1.98, 1.2);
-    group.add(brow);
+    // Querschnitts-Tabellen glatt interpolieren (Catmull-Rom je Spalte)
+    function sampleRows(rows, f, out) {
+      const x = f * (rows.length - 1);
+      const i = Math.min(rows.length - 2, Math.floor(x));
+      const t = x - i;
+      const r0 = rows[Math.max(0, i - 1)];
+      const r1 = rows[i];
+      const r2 = rows[i + 1];
+      const r3 = rows[Math.min(rows.length - 1, i + 2)];
+      for (let k = 0; k < r1.length; k++) {
+        const p0 = r0[k];
+        const p1 = r1[k];
+        const p2 = r2[k];
+        const p3 = r3[k];
+        out[k] = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+      }
+      return out;
+    }
+    // Körperhülle mit abgerundet-kantigem Querschnitt (Superellipse), vorne und
+    // hinten unterschiedlich tief: rows = [[y, halbe Breite, Tiefe vorn, Tiefe hinten], …]
+    function shell(rows, nRows, nCols, power, extra) {
+      const row = [];
+      const ex = 2 / power;
+      return gridSurface(seg(nRows), seg(nCols), (u, v, out) => {
+        sampleRows(rows, v, row);
+        const th = u * Math.PI * 2;
+        const s = Math.sin(th);
+        const c = Math.cos(th);
+        const x = Math.sign(s) * Math.pow(Math.abs(s), ex) * row[1];
+        const z = Math.sign(c) * Math.pow(Math.abs(c), ex) * (c > 0 ? row[2] : row[3]);
+        out.set(x, row[0], z);
+        if (extra) extra(out, th, v);
+      });
+    }
 
-    // Kinnpartie
-    const chin = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.55, 5), maskMat);
-    chin.rotation.x = Math.PI;
-    chin.position.set(0, 0.68, 0.75);
-    group.add(chin);
+    // ---- Rumpf: grüne Tunika über breiter Brust (V-Form), schmale Taille ----
+    clothParts.push(
+      shell(
+        [
+          [3.82, 0.5, 0.3, 0.34], [4.15, 0.62, 0.34, 0.38], [4.72, 0.55, 0.31, 0.32], [5.15, 0.64, 0.36, 0.35],
+          [5.55, 0.79, 0.42, 0.38], [5.9, 0.86, 0.46, 0.4], [6.12, 0.84, 0.42, 0.39], [6.32, 0.68, 0.34, 0.34],
+          [6.5, 0.4, 0.26, 0.27], [6.62, 0.24, 0.2, 0.2], [6.78, 0.21, 0.18, 0.18],
+        ],
+        30,
+        32,
+        2.6,
+        (out) => {
+          // Brustmuskulatur unter dem Stoff andeuten
+          if (out.z > 0) out.z += 0.05 * gauss(out.y - 5.85, 0.22) * gauss(Math.abs(out.x) - 0.33, 0.25);
+        }
+      )
+    );
+    // Tunika-Rock bis knapp über das Knie, unten weiter, mit Faltenwurf
+    clothParts.push(
+      shell(
+        [[2.85, 0.95, 0.6, 0.68], [3.3, 0.88, 0.55, 0.62], [3.85, 0.79, 0.47, 0.52], [4.35, 0.68, 0.39, 0.42], [4.8, 0.58, 0.34, 0.35]],
+        12,
+        44,
+        2.2,
+        (out, th, v) => {
+          const w = Math.pow(1 - v, 1.5);
+          const d = (0.05 * Math.sin(th * 11 + 0.3) + 0.02 * Math.sin(th * 5 + 1)) * w;
+          out.x += Math.sin(th) * d;
+          out.z += Math.cos(th) * d;
+          out.y += 0.015 * Math.sin(th * 11 + 0.3) * Math.pow(1 - v, 4);
+        }
+      )
+    );
 
-    // Kapuze über der Maske, mit spitzem Abschluss
-    const hoodMat = new THREE.MeshStandardMaterial({
-      color: 0x0d3320,
-      roughness: 0.78,
-      metalness: 0.2,
-      flatShading: true,
-      side: THREE.DoubleSide,
+    // ---- Gürtel mit runder Schnalle (klassischer Doom-Look) ----
+    darkParts.push(shell([[4.6, 0.6, 0.36, 0.37], [4.63, 0.635, 0.39, 0.4], [4.78, 0.635, 0.39, 0.4], [4.81, 0.6, 0.36, 0.37]], 4, 36, 2.4));
+    maskParts.push(place(new THREE.CylinderGeometry(0.12, 0.12, 0.05, seg(24)), 0, 4.705, 0.4, Math.PI / 2));
+    maskParts.push(place(new THREE.TorusGeometry(0.12, 0.02, 6, seg(24)), 0, 4.705, 0.425));
+
+    // ---- Rüstung: Halskragen (dunkel, im Schatten der Kapuze), Schulterplatten,
+    // Arme, Hände, Beine, Stiefel ----
+    darkParts.push(place(lathe([[0.23, 6.86], [0.27, 6.76], [0.32, 6.62], [0.45, 6.52], [0.52, 6.46], [0.47, 6.42]], 28, 0.72), 0, 0, 0.02));
+    [-1, 1].forEach((s) => {
+      // Dreilagige Schulterplatte, nach außen geneigt
+      armorParts.push(place(new THREE.SphereGeometry(0.48, seg(22), seg(10), 0, Math.PI * 2, 0, 1.4), s * 1.03, 6.18, -0.02, 0, 0, -s * 0.42, 1, 0.72, 0.95));
+      armorParts.push(place(new THREE.SphereGeometry(0.5, seg(22), 3, 0, Math.PI * 2, 1.12, 0.36), s * 1.07, 6.06, -0.02, 0, 0, -s * 0.5, 1, 0.78, 0.98));
+      armorParts.push(place(new THREE.SphereGeometry(0.52, seg(22), 3, 0, Math.PI * 2, 1.22, 0.34), s * 1.1, 5.95, -0.02, 0, 0, -s * 0.58, 1, 0.78, 1));
     });
-    const hood = new THREE.Mesh(new THREE.SphereGeometry(1.4, 9, 8, 0, Math.PI * 2, 0, Math.PI * 0.56), hoodMat);
-    hood.position.set(0, 2.05, -0.3);
-    group.add(hood);
-    const hoodPoint = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.85, 6), hoodMat);
-    hoodPoint.position.set(0, 3.05, -0.55);
-    group.add(hoodPoint);
+    // Oberarm mit Deltamuskel und Bizeps, Unterarm als Panzerhandschuh
+    const upperArm = [[0, 0], [0.03, 0.18], [0.12, 0.23], [0.35, 0.21], [0.38, 0.198], [0.41, 0.213], [0.55, 0.218], [0.8, 0.168], [0.94, 0.145], [1, 0]];
+    const forearm = [[0, 0], [0.03, 0.15], [0.12, 0.17], [0.3, 0.19], [0.55, 0.16], [0.8, 0.125], [0.94, 0.112], [1, 0]];
+    function arm(sh, el, wr) {
+      armorParts.push(limb(sh, el, upperArm), limb(el, wr, forearm));
+      // ausgestellte Stulpe des Handschuhs
+      armorParts.push(limb(el.clone().lerp(wr, 0.3), el.clone().lerp(wr, 0.46), [[0, 0.225], [0.2, 0.218], [1, 0.17]]));
+      // Ellbogenkachel
+      armorParts.push(place(new THREE.SphereGeometry(0.13, seg(10), seg(6)), el.x, el.y, el.z - 0.06, 0, 0, 0, 1, 1, 0.8));
+    }
+    // Rechter Arm hängt locker herab, Faust geballt
+    const rS = V(-1.04, 6.1, -0.02);
+    const rE = V(-1.25, 5.0, -0.12);
+    const rW = V(-1.38, 4.0, 0.14);
+    arm(rS, rE, rW);
+    armorParts.push(place(new THREE.SphereGeometry(0.5, seg(12), seg(8)), rW.x - 0.01, rW.y - 0.14, rW.z + 0.02, 0, 0, 0, 0.26, 0.34, 0.3));
+    armorParts.push(place(new THREE.SphereGeometry(0.5, seg(8), seg(6)), rW.x + 0.06, rW.y - 0.1, rW.z + 0.12, 0, 0, 0, 0.09, 0.14, 0.09));
+    // Linker Arm angewinkelt, die offene Hand trägt eine Energiekugel
+    const lS = V(1.04, 6.1, -0.02);
+    const lE = V(1.3, 5.05, -0.1);
+    const lW = V(1.92, 5.56, 0.5);
+    const lDir = new THREE.Vector3().subVectors(lW, lE).normalize();
+    arm(lS, lE, lW);
+    const palm = lW.clone().addScaledVector(lDir, 0.14);
+    armorParts.push(place(new THREE.SphereGeometry(0.5, seg(12), seg(8)), palm.x, palm.y - 0.02, palm.z, 0, Math.atan2(lDir.x, lDir.z), 0, 0.28, 0.12, 0.36));
+    const orbPos = palm.clone().add(V(0, 0.25, 0));
+    // Beine: Panzerschenkel, Kniekacheln, Beinschienen, Stiefel mit Stulpe
+    [-1, 1].forEach((s) => {
+      const hip = V(s * 0.34, 3.95, 0);
+      const knee = V(s * 0.38, 2.15, 0.04);
+      const ankle = V(s * 0.41, 0.42, -0.03);
+      armorParts.push(
+        limb(hip, knee, [[0, 0], [0.03, 0.29], [0.15, 0.33], [0.45, 0.305], [0.48, 0.29], [0.51, 0.302], [0.8, 0.24], [0.95, 0.205], [1, 0]]),
+        limb(knee, ankle, [[0, 0], [0.04, 0.195], [0.2, 0.232], [0.45, 0.218], [0.48, 0.205], [0.51, 0.215], [0.75, 0.165], [0.95, 0.14], [1, 0]]),
+        limb(V(s * 0.41, 0.3, -0.03), V(s * 0.4, 0.88, -0.01), [[0, 0.16], [0.6, 0.178], [0.94, 0.222], [1, 0.205]])
+      );
+      armorParts.push(place(new THREE.SphereGeometry(0.18, seg(12), seg(8)), knee.x, knee.y + 0.03, knee.z + 0.11, 0, 0, 0, 1, 1.25, 0.55));
+      // Stiefel: flache Sohle, schmal zulaufende Spitze
+      const foot = new THREE.SphereGeometry(0.5, seg(16), seg(10));
+      const p = foot.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        let x = p.getX(i) * 0.31;
+        let y = p.getY(i) * 0.26;
+        const z = p.getZ(i) * 0.66;
+        if (y < 0) y *= 0.35;
+        x *= 1 - 0.35 * sstep(0.0, 0.33, z);
+        y *= 1 - 0.35 * sstep(0.05, 0.33, z);
+        p.setXYZ(i, x, y, z);
+      }
+      smoothNormals(foot);
+      armorParts.push(place(foot, s * 0.42, 0.09, 0.12));
+    });
 
-    // Schmale, glühende Augenschlitze
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x39ff6a });
-    const eyeGeo = new THREE.BoxGeometry(0.32, 0.09, 0.12);
-    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.34, 1.62, 1.35);
-    const eyeR = eyeL.clone();
-    eyeR.position.x = 0.34;
-    group.add(eyeL, eyeR);
+    // ---- Umhang: von den Schultern bis zum Boden, nach unten ausgestellt,
+    // mit Faltenwurf; der Schwung kommt aus dem Vertex-Shader ----
+    const capeGeo = gridSurface(seg(26), seg(44), (u, v, out) => {
+      const a = (u * 2 - 1) * (1.36 - 0.08 * v);
+      const fold = (0.03 + 0.16 * v) * (0.6 * Math.sin(a * 6.5 + 0.7) + 0.4 * Math.sin(a * 12 + 1.9 + v * 2.5));
+      const rx = 1.05 + 0.8 * Math.pow(v, 0.85) + fold;
+      const rz = 0.5 + 0.7 * v + fold;
+      out.set(Math.sin(a) * rx, 6.38 - v * 6.32 + 0.06 * v * v * Math.sin(a * 6.5 + 0.7), -Math.cos(a) * rz - 0.04 - 0.22 * v);
+    });
 
-    const eyeLight = new THREE.PointLight(0x39ff6a, 2.6, 16, 2);
-    eyeLight.position.set(0, 1.6, 1.7);
-    group.add(eyeLight);
+    // Energiekern in der Hand
+    glowParts.push(place(new THREE.SphereGeometry(0.15, seg(16), seg(12)), orbPos.x, orbPos.y, orbPos.z));
+
+    const meshes = [
+      new THREE.Mesh(merge(maskParts), maskMat),
+      new THREE.Mesh(merge(armorParts), armorMat),
+      new THREE.Mesh(merge(darkParts), darkMat),
+      new THREE.Mesh(merge(clothParts), clothMat),
+      new THREE.Mesh(capeGeo, capeMat),
+      new THREE.Mesh(merge(glowParts), glowMat),
+    ];
+    meshes.forEach((m) => body.add(m));
+
+    // ---- Dezente grüne Energie: Augenglühen, Kugel-Halo, schwache Aura ----
+    const glowTex = (() => {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 64;
+      const g = cv.getContext("2d");
+      const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, "rgba(255,255,255,1)");
+      gr.addColorStop(0.25, "rgba(255,255,255,0.55)");
+      gr.addColorStop(0.6, "rgba(255,255,255,0.12)");
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = gr;
+      g.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(cv);
+    })();
+    const glowSprite = (color, opacity, x, y, z, sx, sy) => {
+      const sp = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: glowTex,
+          color,
+          opacity,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        })
+      );
+      sp.position.set(x, y, z);
+      sp.scale.set(sx, sy, 1);
+      body.add(sp);
+      return sp;
+    };
+    const eyeGlows = [-1, 1].map((s) => glowSprite(0x5cff88, 0.95, HEAD.x + s * 0.13, HEAD.y + 0.025, HEAD.z + 0.44, 0.42, 0.19));
+    const orbHalo = glowSprite(0x3dff7a, 0.7, orbPos.x, orbPos.y, orbPos.z, 0.85, 0.85);
+    glowSprite(0x1fd45e, 0.1, 0, 4.6, -0.7, 5.2, 8.6);
+
+    // Wenige, langsam aufsteigende Funken und ein feines Knistern um die Kugel —
+    // Bewegung komplett im Shader (keine Pufferänderung pro Frame).
+    const motes = LOW_TIER ? 10 : 18;
+    const sparks = LOW_TIER ? 6 : 10;
+    const seeds = new Float32Array((motes + sparks) * 4);
+    for (let i = 0; i < motes + sparks; i++) {
+      const spark = i >= motes;
+      seeds[i * 4] = Math.random() * Math.PI * 2;
+      seeds[i * 4 + 1] = spark ? -(0.16 + Math.random() * 0.14) : 0.9 + Math.random() * 1.3;
+      seeds[i * 4 + 2] = spark ? 0.35 + Math.random() * 0.3 : 0.03 + Math.random() * 0.03;
+      seeds[i * 4 + 3] = Math.random();
+    }
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((motes + sparks) * 3), 3));
+    pGeo.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 4));
+    const pMat = new THREE.PointsMaterial({
+      color: 0x7dffa2,
+      map: glowTex,
+      size: 0.75,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+    });
+    pMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uDoomTime = doomTime;
+      shader.uniforms.uOrb = { value: orbPos };
+      shader.vertexShader =
+        "uniform float uDoomTime;\nuniform vec3 uOrb;\nattribute vec4 aSeed;\nvarying float vFade;\n" +
+        shader.vertexShader
+          .replace(
+            "#include <begin_vertex>",
+            `float life = fract(aSeed.w + uDoomTime * aSeed.z);
+            vec3 transformed;
+            if (aSeed.y > 0.0) {
+              float ang = aSeed.x + uDoomTime * 0.1;
+              transformed = vec3(cos(ang) * aSeed.y, mix(0.5, 8.2, life), sin(ang) * aSeed.y * 0.5 - 0.3);
+              vFade = sin(life * 3.14159) * 0.6;
+            } else {
+              float ang = aSeed.x + uDoomTime * 2.2;
+              float rr = -aSeed.y * (0.7 + 0.5 * life);
+              transformed = uOrb + vec3(cos(ang) * rr, (life - 0.35) * 0.45, sin(ang) * rr);
+              vFade = 1.0 - life;
+            }`
+          )
+          .replace("gl_PointSize = size;", "gl_PointSize = size * (aSeed.y > 0.0 ? 1.0 : 0.6);");
+      shader.fragmentShader = "varying float vFade;\n" + shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n diffuseColor.a *= vFade;");
+    };
+    const particles = new THREE.Points(pGeo, pMat);
+    particles.frustumCulled = false;
+    body.add(particles);
+
+    // Grünes Augenlicht: kurze Reichweite, färbt nur Maske, Kapuzeninneres und Halskragen
+    const eyeLight = new THREE.PointLight(0x39ff6a, 2.4, 2.4, 2);
+    eyeLight.position.set(HEAD.x, HEAD.y + 0.02, HEAD.z + 0.6);
+    body.add(eyeLight);
 
     const clickTargets = [];
     group.traverse((o) => {
@@ -3980,11 +4545,21 @@
       }
     });
 
-    group.scale.setScalar(1.7);
+    // Langsames Pulsieren von Augen und Energiekugel (bei reduzierter Bewegung ruhig)
+    function update(tm) {
+      doomTime.value = tm;
+      const eye = Math.sin(tm * 2.1);
+      eyeLight.intensity = 2.4 + 0.5 * eye;
+      eyeGlows[0].material.opacity = eyeGlows[1].material.opacity = 0.85 + 0.15 * eye;
+      const orb = 0.5 + 0.5 * Math.sin(tm * 1.6);
+      orbHalo.material.opacity = 0.55 + 0.3 * orb;
+      orbHalo.scale.setScalar(0.78 + 0.16 * orb);
+    }
+
     group.position.set(-26, 12, -8);
     group.rotation.y = 0.45;
 
-    return { group, eyeLight, clickTargets };
+    return { group, eyeLight, clickTargets, update };
   }
   const doomFigure = createDoomFigure();
   scene.add(doomFigure.group);
@@ -4113,7 +4688,9 @@
   const PLANET_DRIFT = 0.3;
   const EDGE_MARGIN_PX = 18;
   const FALLBACK_LAYOUT = { wide: [0, 0.68, 0.08], tall: [0, 0.66, 0.06], d: 95 };
-  const DOOM_LAYOUT = { wide: [-0.58, 0.74], tall: [-0.66, 0.27], d: 125 };
+  // Die Doom-Figur schwebt als entfernte, bedrohliche Silhouette im Hintergrund;
+  // scale = [Querformat, Hochformat] (Modell ≈ 8 Einheiten hoch).
+  const DOOM_LAYOUT = { wide: [-0.58, 0.765], tall: [-0.66, 0.248], d: 125, scale: [1.8, 1.5] };
   const STONE_LAYOUT = {
     space: { wide: [0.4, 0.22], tall: [0.3, 0.1], d: 64 },
     mind: { wide: [-0.14, 0.58], tall: [-0.25, 0.3], d: 58 },
@@ -4231,6 +4808,9 @@
 
     placeFromScreen(DOOM_LAYOUT, t, tanV, tanH, doomAnchor);
     if (initial) doomFigure.group.position.copy(doomAnchor);
+    // Im Hochformat etwas kleiner, damit die Figur zwischen die Planeten passt
+    const doomScale = DOOM_LAYOUT.scale[1] * tallGrow + (DOOM_LAYOUT.scale[0] - DOOM_LAYOUT.scale[1] * tallGrow) * t;
+    doomFigure.group.scale.setScalar(doomScale);
 
     infinityStones.stoneMeshes.forEach((m) => {
       const entry = STONE_LAYOUT[m.userData.stoneId];
@@ -4239,8 +4819,6 @@
       m.position.copy(m.userData.basePos);
     });
   }
-  // Die Doom-Figur schwebt als entfernte, bedrohliche Silhouette im Hintergrund.
-  doomFigure.group.scale.setScalar(1.35);
   applyLayout(true);
 
   // ---------- HTML labels ----------
@@ -5939,7 +6517,7 @@
     doomFigure.group.rotation.y = 0.45 + Math.sin(tm * 0.15) * 0.3;
     doomFigure.group.position.copy(doomAnchor);
     doomFigure.group.position.y += Math.sin(tm * 0.4) * 0.5;
-    doomFigure.eyeLight.intensity = 2.6 + Math.sin(t * 3) * 0.9;
+    doomFigure.update(tm);
 
     infinityStones.stoneMeshes.forEach((m) => {
       m.rotation.x += dt * 0.6;
